@@ -1,0 +1,69 @@
+[
+    {
+        "id": 0,
+        "deps": [],
+        "status": "pending",
+        "stats": {
+            "avg": 5.0
+        },
+        "partitions": 2,
+        "tasks": [
+            {
+                "index": 0,
+                "status": "pending",
+                "stage_id": 0,
+                "instances": {}
+            },
+            {
+                "index": 1,
+                "status": "pending",
+                "stage_id": 0,
+                "instances": {}
+            }
+        ]
+    },
+    {
+        "id": 1,
+        "deps": [0],
+        "status": "pending",
+        "stats": {
+            "shuffle": {
+                "avg": 4.0
+            },
+            "avg": 5.0
+        },
+        "partitions": 4,
+        "tasks": [
+            {
+                "index": 0,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            },
+            {
+                "index": 1,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            },
+            {
+                "index": 2,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            },
+            {
+                "index": 3,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            },
+            {
+                "index": 4,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            }
+        ]
+    }
+]
