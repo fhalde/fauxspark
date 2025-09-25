@@ -1,0 +1,47 @@
+[
+    {
+        "id": 0,
+        "deps": [],
+        "status": "pending",
+        "stats": {
+            "avg": 1.0,
+            "std": 0.0,
+            "var": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p95": 0.0
+        },
+        "partitions": 10,
+        "tasks": []
+    },
+    {
+        "id": 1,
+        "deps": [],
+        "status": "pending",
+        "stats": {
+            "avg": 1.0,
+            "std": 0.0,
+            "var": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p95": 0.0
+        },
+        "partitions": 10,
+        "tasks": []
+    },
+    {
+        "id": 2,
+        "deps": [0, 1],
+        "status": "pending",
+        "stats": {
+            "avg": 1.0,
+            "std": 0.0,
+            "var": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p95": 0.0
+        },
+        "partitions": 10,
+        "tasks": []
+    }
+]
