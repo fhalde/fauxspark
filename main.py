@@ -1,18 +1,21 @@
 import simpy
-import random
 import json
 
 
 class LaunchTask:
-    def __init__(self, task, stage):
+    __match_args__ = ("task", "stage_id")
+
+    def __init__(self, task, stage_id):
         self.task = task
-        self.stage = stage
+        self.stage_id = stage_id
 
     def __repr__(self):
-        return f"LaunchTask(id={self.task['id']}, index={self.task['index']}, stage_id={self.stage['id']}, deps={self.stage['deps']})"
+        return f"LaunchTask(id={self.task['id']}, index={self.task['index']}, stage_id={self.stage_id})"
 
 
 class KillTask:
+    __match_args__ = ("id",)
+
     def __init__(self, id):
         self.id = id
 
@@ -21,12 +24,24 @@ class KillTask:
 
 
 class StatusUpdate:
-    def __init__(self, launchref: LaunchTask, status):
-        self.launchref = launchref
+    __match_args__ = ("launch_task_ref", "status")
+
+    def __init__(self, launch_task_ref: LaunchTask, status):
+        self.launch_task_ref = launch_task_ref
         self.status = status
 
     def __repr__(self):
-        return f"StatusUpdate(id={self.launchref.task['id']}, index={self.launchref.task['index']}, stage_id={self.launchref.stage['id']}, status={self.status})"
+        return f"StatusUpdate(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.stage_id}, status={self.status})"
+
+
+class KillExecutor:
+    __match_args__ = ("executor_id",)
+
+    def __init__(self, executor_id):
+        self.executor_id = executor_id
+
+    def __repr__(self):
+        return f"KillExecutor(executor_id={self.executor_id})"
 
 
 E = 1
@@ -35,14 +50,12 @@ env = simpy.Environment()
 scheduler_queue = simpy.Store(env)
 DAG = json.load(open("dag2.json"))
 for stage in DAG:
-    stage["tasks"] = [
-        {"index": i, "status": "pending"} for i in range(stage["partitions"])
-    ]
+    stage["tasks"] = [{"index": i, "status": "pending"} for i in range(stage["partitions"])]
 
 
-def launch_task(msg: LaunchTask, executor_queue):
-    yield env.timeout(msg.stage["stats"]["avg"])
-    executor_queue.put(StatusUpdate(msg, "completed"))
+def launch_task(task: LaunchTask, executor_queue):
+    yield env.timeout(DAG[task.stage_id]["stats"]["avg"])
+    executor_queue.put(StatusUpdate(task, "completed"))
 
 
 def executor(id, executor_queue):
@@ -61,8 +74,10 @@ executors = {
     id: {
         "id": id,
         "cores": cores,
+        "available_slots": cores,
         "instance": env.process(executor(id, (queue := simpy.Store(env)))),
         "queue": queue,
+        "running_tasks": {},
     }
     for id in range(E)
 }
@@ -75,14 +90,14 @@ def schedulable_tasks():
             DAG[dep]["status"] == "completed" for dep in stage["deps"]
         ):
             for task in stage["tasks"]:
-                if task["status"] == "pending":
+                if task["status"] not in ["completed", "running"]:
                     acc.append([stage, task])
     return acc
 
 
 def next_available_executor():
     for _, executor in executors.items():
-        if executor["cores"] > 0:
+        if executor["available_slots"] > 0:
             return executor
     return None
 
@@ -105,22 +120,35 @@ def scheduler():
                     "id": (id := nextid()),
                     "executor-id": executor["id"],
                     "status": "running",
+                    "stage": {
+                        "id": stage["id"],
+                        "deps": stage["deps"],
+                    }
                 }
             )
-            yield executor["queue"].put(LaunchTask(task.copy(), stage.copy()))
-            executor["cores"] -= 1
+            task = task.copy()
+            task["stage_id"] = stage["id"]
+            executor["running_tasks"][task["id"]] = task
+            yield executor["queue"].put(LaunchTask(task, stage["id"]))
+            executor["available_slots"] -= 1
         event = yield scheduler_queue.get()
         match event:
-            case StatusUpdate() as status_update:
-                DAG[status_update.launchref.stage["id"]]["tasks"][
-                    status_update.launchref.task["index"]
-                ]["status"] = status_update.status
-                if all(
-                    task["status"] == "completed"
-                    for task in DAG[status_update.launchref.stage["id"]]["tasks"]
-                ):
-                    DAG[status_update.launchref.stage["id"]]["status"] = "completed"
-                executors[status_update.launchref.task["executor-id"]]["cores"] += 1
+            case KillExecutor(executor_id):
+                executor = executors[executor_id]
+                for tasks in executor["running_tasks"].values():
+                    DAG[tasks["stage_id"]]["tasks"][tasks["index"]]["status"] = "killed"
+                executor["available_slots"] = executor["cores"]
+                executor["running_tasks"] = set()
+            case StatusUpdate(LaunchTask(task, stage_id), status):
+                executor = executors[task["executor-id"]]
+                if task["id"] in executor["running_tasks"]:
+                    # update task status
+                    DAG[stage_id]["tasks"][task["index"]]["status"] = status
+                    # update stage status
+                    if all(task["status"] == "completed" for task in DAG[stage_id]["tasks"]):
+                        DAG[stage_id]["status"] = "completed"
+                    executors[task["executor-id"]]["available_slots"] += 1
+                    del executor["running_tasks"][task["id"]]
 
 
 env.process(scheduler())
@@ -128,14 +156,3 @@ start_time = env.now
 env.run()
 end_time = env.now
 print(f"Total time taken: {end_time - start_time}")
-
-
-"""
-send a task to an executor with id, index, stage_id, deps
-deps, which is just a list of stage ids, is used to determine if the executors
-where the tasks of the deps ran are still running.
-when executors return status update, scheduler would like to mark the status of the task as complete.
-for it, it needs to know the stage id. or, if a task id is unique, we can maintain a mapping from id->stage id
-as task complete, a stage might complete. mark its status appropriately.
-
-"""
