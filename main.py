@@ -33,6 +33,17 @@ class StatusUpdate:
         return f"StatusUpdate(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.task['stage']['id']}, status={self.status})"
 
 
+class RegisterExecutor:
+    __match_args__ = ("executor_id", "spec")
+
+    def __init__(self, executor_id, spec):
+        self.executor_id = executor_id
+        self.spec = spec
+
+    def __repr__(self):
+        return f"AddExecutor(executor_id={self.executor_id})"
+
+
 class KillExecutor:
     __match_args__ = ("executor_id",)
 
@@ -66,20 +77,9 @@ def executor(id, executor_queue):
                 env.process(launch_task(task, executor_queue))
             case StatusUpdate() as status_update:
                 scheduler_queue.put(status_update)
-                print(f"{env.now}: executor {id} status update {status_update}")
 
 
-executors = {
-    id: {
-        "id": id,
-        "cores": cores,
-        "available_slots": cores,
-        "instance": env.process(executor(id, (queue := simpy.Store(env)))),
-        "queue": queue,
-        "running_tasks": {},
-    }
-    for id in range(E)
-}
+executors = {}
 
 
 def schedulable_tasks():
@@ -111,14 +111,12 @@ def scheduler():
         return taskid
 
     while True:
-        runnable_tasks = schedulable_tasks()
-        while (executor := next_available_executor()) and runnable_tasks != []:
-            stage, task = runnable_tasks.pop(0)
-            stage["status"] = "running"
+        while (executor := next_available_executor()) and (runnable_tasks:= schedulable_tasks()) != []:
+            stage, task = runnable_tasks.pop()
+            stage["status"], task["status"] = "running", "running"
             task = task | {
                 "id": (id := nextid()),
                 "executor_id": executor["id"],
-                "status": "running",
                 "stage": {
                     "id": stage["id"],
                     "deps": stage["deps"],
@@ -130,14 +128,20 @@ def scheduler():
             executor["available_slots"] -= 1
         event = yield scheduler_queue.get()
         match event:
+            case RegisterExecutor(executor_id, spec):
+                print(f"{env.now}: register executor {executor_id}")
+                executors[executor_id] = spec
             case KillExecutor(executor_id):
+                print(f"{env.now}: kill executor {executor_id}")
                 executor = executors[executor_id]
                 for tasks in executor["running_tasks"].values():
-                    running_tasks.remove(tasks["id"])
                     DAG[tasks["stage"]["id"]]["tasks"][tasks["index"]]["status"] = "killed"
-                del executor[executor_id]
+                    running_tasks.remove(tasks["id"])
+                del executors[executor_id]
             case StatusUpdate(LaunchTask(task), status):
+                print(f"{env.now}: status update {task['id']} {status}")
                 if task["id"] not in running_tasks:
+                    print(f"{env.now}: status update {task['id']} {status} not in running tasks")
                     continue
                 # update task status
                 stage = task["stage"]
@@ -150,8 +154,35 @@ def scheduler():
                 executor["running_tasks"].pop(task["id"])
                 running_tasks.remove(task["id"])
 
+def monitor():
+    yield env.timeout(1)
+    # kill executor 0
+    scheduler_queue.put(KillExecutor(0))
+    yield env.timeout(5)
+    # a new one is registered after 5 seconds
+    scheduler_queue.put(RegisterExecutor(1, {
+        "id": 1,
+        "cores": cores,
+        "available_slots": cores,
+        "instance": env.process(executor(1, (queue := simpy.Store(env)))),
+        "queue": queue,
+        "running_tasks": {},
+    }))
+
 
 env.process(scheduler())
+
+for i in range(E):
+    scheduler_queue.put(RegisterExecutor(i, {
+        "id": i,
+        "cores": cores,
+        "available_slots": cores,
+        "instance": env.process(executor(i, (queue := simpy.Store(env)))),
+        "queue": queue,
+        "running_tasks": {},
+    }))
+
+env.process(monitor())
 start_time = env.now
 env.run()
 end_time = env.now
