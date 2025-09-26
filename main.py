@@ -3,14 +3,13 @@ import json
 
 
 class LaunchTask:
-    __match_args__ = ("task", "stage_id")
+    __match_args__ = ("task",)
 
-    def __init__(self, task, stage_id):
+    def __init__(self, task):
         self.task = task
-        self.stage_id = stage_id
 
     def __repr__(self):
-        return f"LaunchTask(id={self.task['id']}, index={self.task['index']}, stage_id={self.stage_id})"
+        return f"LaunchTask(id={self.task['id']}, index={self.task['index']}, stage_id={self.task['stage']['id']})"
 
 
 class KillTask:
@@ -31,7 +30,7 @@ class StatusUpdate:
         self.status = status
 
     def __repr__(self):
-        return f"StatusUpdate(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.stage_id}, status={self.status})"
+        return f"StatusUpdate(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.task['stage']['id']}, status={self.status})"
 
 
 class KillExecutor:
@@ -54,7 +53,7 @@ for stage in DAG:
 
 
 def launch_task(task: LaunchTask, executor_queue):
-    yield env.timeout(DAG[task.stage_id]["stats"]["avg"])
+    yield env.timeout(DAG[task.task["stage"]["id"]]["stats"]["avg"])
     executor_queue.put(StatusUpdate(task, "completed"))
 
 
@@ -104,6 +103,7 @@ def next_available_executor():
 
 def scheduler():
     taskid = 0
+    running_tasks = set()
 
     def nextid():
         nonlocal taskid
@@ -115,40 +115,40 @@ def scheduler():
         while (executor := next_available_executor()) and runnable_tasks != []:
             stage, task = runnable_tasks.pop(0)
             stage["status"] = "running"
-            task.update(
-                {
-                    "id": (id := nextid()),
-                    "executor-id": executor["id"],
-                    "status": "running",
-                    "stage": {
-                        "id": stage["id"],
-                        "deps": stage["deps"],
-                    }
-                }
-            )
-            task = task.copy()
-            task["stage_id"] = stage["id"]
+            task = task | {
+                "id": (id := nextid()),
+                "executor_id": executor["id"],
+                "status": "running",
+                "stage": {
+                    "id": stage["id"],
+                    "deps": stage["deps"],
+                },
+            }
+            running_tasks.add(task["id"])
             executor["running_tasks"][task["id"]] = task
-            yield executor["queue"].put(LaunchTask(task, stage["id"]))
+            yield executor["queue"].put(LaunchTask(task))
             executor["available_slots"] -= 1
         event = yield scheduler_queue.get()
         match event:
             case KillExecutor(executor_id):
                 executor = executors[executor_id]
                 for tasks in executor["running_tasks"].values():
-                    DAG[tasks["stage_id"]]["tasks"][tasks["index"]]["status"] = "killed"
-                executor["available_slots"] = executor["cores"]
-                executor["running_tasks"] = set()
-            case StatusUpdate(LaunchTask(task, stage_id), status):
-                executor = executors[task["executor-id"]]
-                if task["id"] in executor["running_tasks"]:
-                    # update task status
-                    DAG[stage_id]["tasks"][task["index"]]["status"] = status
-                    # update stage status
-                    if all(task["status"] == "completed" for task in DAG[stage_id]["tasks"]):
-                        DAG[stage_id]["status"] = "completed"
-                    executors[task["executor-id"]]["available_slots"] += 1
-                    del executor["running_tasks"][task["id"]]
+                    running_tasks.remove(tasks["id"])
+                    DAG[tasks["stage"]["id"]]["tasks"][tasks["index"]]["status"] = "killed"
+                del executor[executor_id]
+            case StatusUpdate(LaunchTask(task), status):
+                if task["id"] not in running_tasks:
+                    continue
+                # update task status
+                stage = task["stage"]
+                DAG[stage["id"]]["tasks"][task["index"]]["status"] = status
+                # update stage status
+                if all(task["status"] == "completed" for task in DAG[stage["id"]]["tasks"]):
+                    DAG[stage["id"]]["status"] = "completed"
+                executor = executors[task["executor_id"]]
+                executor["available_slots"] += 1
+                executor["running_tasks"].pop(task["id"])
+                running_tasks.remove(task["id"])
 
 
 env.process(scheduler())
