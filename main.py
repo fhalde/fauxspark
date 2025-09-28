@@ -33,6 +33,17 @@ class StatusUpdate:
         return f"StatusUpdate(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.task['stage']['id']}, status={self.status})"
 
 
+class FetchFailed:
+    __match_args__ = ("launch_task_ref", "dep")
+
+    def __init__(self, launch_task_ref: LaunchTask, dep):
+        self.launch_task_ref = launch_task_ref
+        self.dep = dep
+
+    def __repr__(self):
+        return f"FetchFailed(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.task['stage']['id']}, dep={self.dep})"
+
+
 class RegisterExecutor:
     __match_args__ = ("executor_id", "spec")
 
@@ -138,14 +149,28 @@ def scheduler():
                     DAG[tasks["stage"]["id"]]["tasks"][tasks["index"]]["status"] = "killed"
                     running_tasks.remove(tasks["id"])
                 del executors[executor_id]
-            case StatusUpdate(LaunchTask(task), status):
-                print(f"{env.now}: status update {task['id']} {status}")
+            case FetchFailed(LaunchTask(task), dep):
+                stage = task["stage"]
+                # always reset the current stage.
+                DAG[stage["id"]]["status"] = "pending"
+                for task in DAG[stage["id"]]["tasks"]:
+                    task["status"] = "pending"
+                    # send KillTask message
+                # mark deps as failed (all or some?)
+                for dep in stage["deps"]:
+                    DAG[dep]["status"] = "failed"
+                    for task in DAG[dep]["tasks"]:
+                        if task["executor_id"] not in executors:
+                            task["status"] = "pending"
+                print(f"{env.now}: fetch failed {task['id']} {dep}")
+            case StatusUpdate(LaunchTask(task), "completed"):
+                print(f"{env.now}: status update {task['id']} completed")
                 if task["id"] not in running_tasks:
-                    print(f"{env.now}: status update {task['id']} {status} not in running tasks")
+                    print(f"{env.now}: status update {task['id']} completed but not in running tasks")
                     continue
                 # update task status
                 stage = task["stage"]
-                DAG[stage["id"]]["tasks"][task["index"]]["status"] = status
+                DAG[stage["id"]]["tasks"][task["index"]]["status"] = "completed"
                 # update stage status
                 if all(task["status"] == "completed" for task in DAG[stage["id"]]["tasks"]):
                     DAG[stage["id"]]["status"] = "completed"
