@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Any, List, Mapping
+from colorama import Fore, Style
 
 
 class Stage(BaseModel):
@@ -11,7 +12,7 @@ class Stage(BaseModel):
     tasks: List["Task"]
 
     def __repr__(self):
-        return f"Stage(id={self.id}, status={self.status})"
+        return f"{Fore.CYAN}Stage{Style.RESET_ALL}(id={self.id}, status={self.status})"
 
 
 class Task(BaseModel):
@@ -22,7 +23,7 @@ class Task(BaseModel):
     launched_tasks: Mapping[int, "LaunchTask"] = {}
 
     def __repr__(self):
-        return f"Task(stage={self.stage_id}, index={self.index}, status={self.status})"
+        return f"{Fore.GREEN}Task{Style.RESET_ALL}(stage={self.stage_id}, index={self.index}, status={self.status})"
 
 
 class LaunchTask(BaseModel):
@@ -35,7 +36,7 @@ class LaunchTask(BaseModel):
         return self.task.stage_id
 
     def __repr__(self):
-        return f"LaunchTask(id={self.id}, executor_id={self.executor_id}, status={self.status}, task={self.task!r})"
+        return f"{Fore.YELLOW}LaunchTask{Style.RESET_ALL}(id={self.id}, executor_id={self.executor_id}, status={self.status}, task={self.task!r})"
 
 
 class KillTask(BaseModel):
@@ -47,7 +48,7 @@ class StatusUpdate(BaseModel):
     status: str
 
     def __repr__(self):
-        return f"StatusUpdate(id={self.id}, status={self.status})"
+        return f"{Fore.BLUE}StatusUpdate{Style.RESET_ALL}(id={self.id}, status={self.status})"
 
 
 class FetchFailed(BaseModel):
@@ -55,7 +56,7 @@ class FetchFailed(BaseModel):
     dep: int
 
     def __repr__(self):
-        return f"FetchFailed(id={self.launch_task_ref.task_inst.id}, index={self.launch_task_ref.task_inst.task.index}, stage_id={self.launch_task_ref.task_inst.task.stage_id}, dep={self.dep})"
+        return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.launch_task.id}, executor_id={self.launch_task.executor_id}, dep={self.dep})"
 
 
 class Executor(BaseModel):

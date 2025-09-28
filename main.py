@@ -13,13 +13,18 @@ from models import (
     Task,
 )
 
+from colorama import init, Fore, Style
+
+init(autoreset=True)
+
 
 def main(DAG: list[Stage] = [], E=1, cores=1):
     env = simpy.Environment()
 
     def log(msg):
         nonlocal env
-        print(f"{env.now:6.2f}: {msg}")
+
+        print(f"{Style.BRIGHT}{Fore.RED}{env.now:6.2f}{Style.RESET_ALL}: {msg}")
 
     print("fauxspark!")
     scheduler_queue = simpy.Store(env)
@@ -163,10 +168,8 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
     log("starting scheduler")
     env.process(scheduler())
 
-    start_time = env.now
     env.run()
-    end_time = env.now
-    log(f"Total time taken: {end_time - start_time}")
+    log("simulation completed")
 
 
 if __name__ == "__main__":
