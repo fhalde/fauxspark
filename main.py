@@ -1,77 +1,36 @@
 import simpy
 import json
+from models import *
 
 
-class LaunchTask:
-    __match_args__ = ("task",)
-
-    def __init__(self, task):
-        self.task = task
-
-    def __repr__(self):
-        return f"LaunchTask(id={self.task['id']}, index={self.task['index']}, stage_id={self.task['stage']['id']})"
-
-
-class KillTask:
-    __match_args__ = ("id",)
-
-    def __init__(self, id):
-        self.id = id
-
-    def __repr__(self):
-        return f"KillTask(id={self.id})"
+def scheduler(scheduler_queue, DAG, executors):
+    while True:
+        msg = yield scheduler_queue.get()
+        match msg:
+            case LaunchTask() as task:
+                print(f"{env.now}: scheduler launch task {task}")
+                env.process(launch_task(task, scheduler_queue))
+            case StatusUpdate() as status_update:
+                scheduler_queue.put(status_update)
 
 
-class StatusUpdate:
-    __match_args__ = ("launch_task_ref", "status")
-
-    def __init__(self, launch_task_ref: LaunchTask, status):
-        self.launch_task_ref = launch_task_ref
-        self.status = status
-
-    def __repr__(self):
-        return f"StatusUpdate(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.task['stage']['id']}, status={self.status})"
-
-
-class FetchFailed:
-    __match_args__ = ("launch_task_ref", "dep")
-
-    def __init__(self, launch_task_ref: LaunchTask, dep):
-        self.launch_task_ref = launch_task_ref
-        self.dep = dep
-
-    def __repr__(self):
-        return f"FetchFailed(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.task['stage']['id']}, dep={self.dep})"
-
-
-class RegisterExecutor:
-    __match_args__ = ("executor_id", "spec")
-
-    def __init__(self, executor_id, spec):
-        self.executor_id = executor_id
-        self.spec = spec
-
-    def __repr__(self):
-        return f"AddExecutor(executor_id={self.executor_id})"
-
-
-class KillExecutor:
-    __match_args__ = ("executor_id",)
-
-    def __init__(self, executor_id):
-        self.executor_id = executor_id
-
-    def __repr__(self):
-        return f"KillExecutor(executor_id={self.executor_id})"
-
-
-E = 1
-cores = 1
-env = simpy.Environment()
-scheduler_queue = simpy.Store(env)
-DAG = json.load(open("dag2.json"))
-for stage in DAG:
-    stage["tasks"] = [{"index": i, "status": "pending"} for i in range(stage["partitions"])]
+def main():
+    print("fauxspark!")
+    E = 1
+    cores = 1
+    DAG = [Stage.model_validate(stage) for stage in json.load(open("dag.json"))]
+    env = simpy.Environment()
+    scheduler_queue = simpy.Store(env)
+    executors = {}
+    for i in range(E):
+        executors[i] = RegisterExecutor(
+            id=i,
+            cores=cores,
+            instance=env.process(executor(i, (queue := simpy.Store(env)))),
+            queue=queue,
+            running_tasks={},
+        )
+    env.process(scheduler(scheduler_queue, DAG, executors))
 
 
 def launch_task(task: LaunchTask, executor_queue):
@@ -122,7 +81,9 @@ def scheduler():
         return taskid
 
     while True:
-        while (executor := next_available_executor()) and (runnable_tasks:= schedulable_tasks()) != []:
+        while (executor := next_available_executor()) and (
+            runnable_tasks := schedulable_tasks()
+        ) != []:
             stage, task = runnable_tasks.pop()
             stage["status"], task["status"] = "running", "running"
             task = task | {
@@ -166,7 +127,9 @@ def scheduler():
             case StatusUpdate(LaunchTask(task), "completed"):
                 print(f"{env.now}: status update {task['id']} completed")
                 if task["id"] not in running_tasks:
-                    print(f"{env.now}: status update {task['id']} completed but not in running tasks")
+                    print(
+                        f"{env.now}: status update {task['id']} completed but not in running tasks"
+                    )
                     continue
                 # update task status
                 stage = task["stage"]
@@ -179,33 +142,44 @@ def scheduler():
                 executor["running_tasks"].pop(task["id"])
                 running_tasks.remove(task["id"])
 
+
 def monitor():
     yield env.timeout(1)
     # kill executor 0
     scheduler_queue.put(KillExecutor(0))
     yield env.timeout(5)
     # a new one is registered after 5 seconds
-    scheduler_queue.put(RegisterExecutor(1, {
-        "id": 1,
-        "cores": cores,
-        "available_slots": cores,
-        "instance": env.process(executor(1, (queue := simpy.Store(env)))),
-        "queue": queue,
-        "running_tasks": {},
-    }))
+    scheduler_queue.put(
+        RegisterExecutor(
+            1,
+            {
+                "id": 1,
+                "cores": cores,
+                "available_slots": cores,
+                "instance": env.process(executor(1, (queue := simpy.Store(env)))),
+                "queue": queue,
+                "running_tasks": {},
+            },
+        )
+    )
 
 
 env.process(scheduler())
 
 for i in range(E):
-    scheduler_queue.put(RegisterExecutor(i, {
-        "id": i,
-        "cores": cores,
-        "available_slots": cores,
-        "instance": env.process(executor(i, (queue := simpy.Store(env)))),
-        "queue": queue,
-        "running_tasks": {},
-    }))
+    scheduler_queue.put(
+        RegisterExecutor(
+            i,
+            {
+                "id": i,
+                "cores": cores,
+                "available_slots": cores,
+                "instance": env.process(executor(i, (queue := simpy.Store(env)))),
+                "queue": queue,
+                "running_tasks": {},
+            },
+        )
+    )
 
 env.process(monitor())
 start_time = env.now

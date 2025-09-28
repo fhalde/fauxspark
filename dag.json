@@ -1,10 +1,10 @@
-{
-    "0": {
-        "id": "0",
-        "deps": ["1"],
-        "status": "pending|in-progress|success",
+[
+    {
+        "id": 0,
+        "deps": [],
+        "status": "pending",
         "stats": {
-            "avg": 0.0,
+            "avg": 5.0,
             "std": 0.0,
             "var": 0.0,
             "p50": 0.0,
@@ -14,10 +14,17 @@
         "partitions": 10,
         "tasks": [
             {
-                "id": "0",
-                "executor-id": "executor-0",
-                "status": "pending|in-progress|success"
+                "index": 0,
+                "status": "pending",
+                "stage_id": 0,
+                "instances": {}
+            },
+            {
+                "index": 1,
+                "status": "pending",
+                "stage_id": 0,
+                "instances": {}
             }
         ]
     }
-}
+]

@@ -15,6 +15,7 @@ class TransferStatus(Enum):
 @dataclass
 class Transfer:
     """Represents a file transfer between two nodes"""
+
     id: str
     src_node: str
     dest_node: str
@@ -52,7 +53,9 @@ class Node:
 
         # Simple equal sharing among active uploads
         used_bw = len(self.active_uploads) * (self.upload_bw_gbps / len(self.active_uploads))
-        return max(0, self.upload_bw_gbps - used_bw + (self.upload_bw_gbps / len(self.active_uploads)))
+        return max(
+            0, self.upload_bw_gbps - used_bw + (self.upload_bw_gbps / len(self.active_uploads))
+        )
 
     @property
     def available_download_bw(self) -> float:
@@ -62,7 +65,10 @@ class Node:
 
         # Simple equal sharing among active downloads
         used_bw = len(self.active_downloads) * (self.download_bw_gbps / len(self.active_downloads))
-        return max(0, self.download_bw_gbps - used_bw + (self.download_bw_gbps / len(self.active_downloads)))
+        return max(
+            0,
+            self.download_bw_gbps - used_bw + (self.download_bw_gbps / len(self.active_downloads)),
+        )
 
 
 class NetworkSimulator:
@@ -95,7 +101,7 @@ class NetworkSimulator:
             src_node=src_node_id,
             dest_node=dest_node_id,
             file_size_gb=file_size_gb,
-            status=TransferStatus.PENDING
+            status=TransferStatus.PENDING,
         )
 
         self.transfers[transfer_id] = transfer
@@ -118,18 +124,30 @@ class NetworkSimulator:
         src_node.active_uploads[transfer.id] = transfer
         dest_node.active_downloads[transfer.id] = transfer
 
-        print(f"[{self.env.now:.2f}s] Starting transfer {transfer.id}: {transfer.file_size_gb}GB from {transfer.src_node} to {transfer.dest_node}")
+        print(
+            f"[{self.env.now:.2f}s] Starting transfer {transfer.id}: {transfer.file_size_gb}GB from {transfer.src_node} to {transfer.dest_node}"
+        )
 
         try:
             while transfer.progress_gb < transfer.file_size_gb:
                 # Calculate effective bandwidth (limited by both upload and download)
-                src_bw = src_node.available_upload_bw / len(src_node.active_uploads) if src_node.active_uploads else src_node.upload_bw_gbps
-                dest_bw = dest_node.available_download_bw / len(dest_node.active_downloads) if dest_node.active_downloads else dest_node.download_bw_gbps
+                src_bw = (
+                    src_node.available_upload_bw / len(src_node.active_uploads)
+                    if src_node.active_uploads
+                    else src_node.upload_bw_gbps
+                )
+                dest_bw = (
+                    dest_node.available_download_bw / len(dest_node.active_downloads)
+                    if dest_node.active_downloads
+                    else dest_node.download_bw_gbps
+                )
                 effective_bw = min(src_bw, dest_bw)
 
                 # Calculate how much we can transfer in the next time step (1 second intervals)
                 time_step = 1.0  # 1 second
-                transfer_amount = min(effective_bw * time_step, transfer.file_size_gb - transfer.progress_gb)
+                transfer_amount = min(
+                    effective_bw * time_step, transfer.file_size_gb - transfer.progress_gb
+                )
 
                 # Wait for the time step
                 yield self.env.timeout(time_step)
@@ -137,13 +155,17 @@ class NetworkSimulator:
                 # Update progress
                 transfer.progress_gb += transfer_amount
 
-                print(f"[{self.env.now:.2f}s] Transfer {transfer.id}: {transfer.progress_gb:.2f}/{transfer.file_size_gb}GB ({transfer.progress_percent:.1f}%) - {effective_bw:.2f}Gbps")
+                print(
+                    f"[{self.env.now:.2f}s] Transfer {transfer.id}: {transfer.progress_gb:.2f}/{transfer.file_size_gb}GB ({transfer.progress_percent:.1f}%) - {effective_bw:.2f}Gbps"
+                )
 
             # Transfer completed
             transfer.status = TransferStatus.COMPLETED
             transfer.end_time = self.env.now
 
-            print(f"[{self.env.now:.2f}s] Transfer {transfer.id} completed! Duration: {transfer.end_time - transfer.start_time:.2f}s")
+            print(
+                f"[{self.env.now:.2f}s] Transfer {transfer.id} completed! Duration: {transfer.end_time - transfer.start_time:.2f}s"
+            )
 
         except Exception as e:
             transfer.status = TransferStatus.FAILED
@@ -181,7 +203,7 @@ def demo_network_simulator():
 
     # Add two nodes
     node1 = sim.add_node("node1", upload_bw_gbps=10, download_bw_gbps=10)  # 10 Gbps up/down
-    node2 = sim.add_node("node2", upload_bw_gbps=5, download_bw_gbps=8)    # 5 Gbps up, 8 Gbps down
+    node2 = sim.add_node("node2", upload_bw_gbps=5, download_bw_gbps=8)  # 5 Gbps up, 8 Gbps down
 
     print(f"Created {node1}")
     print(f"Created {node2}\n")
@@ -200,7 +222,9 @@ def demo_network_simulator():
     for tid, transfer in sim.list_transfers().items():
         print(f"Transfer {tid}:")
         print(f"  Status: {transfer.status.value}")
-        print(f"  Progress: {transfer.progress_gb:.2f}/{transfer.file_size_gb}GB ({transfer.progress_percent:.1f}%)")
+        print(
+            f"  Progress: {transfer.progress_gb:.2f}/{transfer.file_size_gb}GB ({transfer.progress_percent:.1f}%)"
+        )
         if transfer.start_time and transfer.end_time:
             duration = transfer.end_time - transfer.start_time
             avg_speed = transfer.progress_gb / duration if duration > 0 else 0

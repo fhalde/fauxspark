@@ -31,9 +31,7 @@ class DAGNode:
         return (self.completed_tasks + self.running_tasks) < self.num_tasks
 
     def __repr__(self):
-        return (
-            f"DAGNode({self.node_id}, tasks: {self.completed_tasks}/{self.num_tasks})"
-        )
+        return f"DAGNode({self.node_id}, tasks: {self.completed_tasks}/{self.num_tasks})"
 
 
 class ExecutorNode:
@@ -147,14 +145,9 @@ class SparkScheduler:
 
                 # Enable dependent nodes
                 for dependent_id in dag_node.dependents:
-                    if (
-                        self.check_node_ready(dependent_id)
-                        and dependent_id not in self.ready_queue
-                    ):
+                    if self.check_node_ready(dependent_id) and dependent_id not in self.ready_queue:
                         self.ready_queue.append(dependent_id)
-                        print(
-                            f"Time {self.env.now:.2f}: DAG node {dependent_id} now ready"
-                        )
+                        print(f"Time {self.env.now:.2f}: DAG node {dependent_id} now ready")
 
             # Trigger scheduling event
             if not self.scheduling_event.triggered:
@@ -266,6 +259,4 @@ if __name__ == "__main__":
     completion_time = scheduler.run_simulation()
 
     print(f"\nJob completed in {completion_time:.2f} time units")
-    print(
-        f"Total tasks processed: {scheduler.total_tasks_completed}/{scheduler.total_tasks}"
-    )
+    print(f"Total tasks processed: {scheduler.total_tasks_completed}/{scheduler.total_tasks}")
