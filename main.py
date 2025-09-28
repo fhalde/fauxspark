@@ -11,7 +11,6 @@ from models import (
     FetchFailed,
     KillExecutor,
     Task,
-    TaskInstance,
 )
 
 
@@ -20,9 +19,9 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
 
     def log(msg):
         nonlocal env
-        print(f"{env.now}: {msg}")
+        print(f"{env.now:6.2f}: {msg}")
 
-    log("fauxspark!")
+    print("fauxspark!")
     scheduler_queue = simpy.Store(env)
     executors: Mapping[int, Executor] = {}
 
@@ -46,43 +45,39 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
     def executor(id, executor_queue):
         running_tasks = {}
 
-        def thread(task_inst: TaskInstance):
+        def thread(launch_task: LaunchTask):
             try:
-                yield env.timeout(DAG[task_inst.task.stage_id].stats["avg"])
-                executor_queue.put(
-                    StatusUpdate(id=task_inst.id, task_inst=task_inst, status="completed")
-                )
+                yield env.timeout(DAG[launch_task.task.stage_id].stats["avg"])
+                executor_queue.put(StatusUpdate(id=launch_task.id, status="completed"))
             except simpy.Interrupt:
-                log(f"executor {id} interrupted taskref={task_inst}")
+                log(f"executor {id} interrupted task={launch_task!r}")
                 return
 
         while True:
             msg = yield executor_queue.get()
             match msg:
-                case LaunchTask(task_inst=task_inst):
-                    log(f"executor={id} task_inst={task_inst}")
-                    running_tasks[task_inst.id] = env.process(thread(task_inst))
+                case LaunchTask() as launch_task:
+                    log(f"executor={id} {launch_task!r}")
+                    running_tasks[launch_task.id] = env.process(thread(launch_task))
 
-                case StatusUpdate(id=id, task_inst=task_inst):
+                case StatusUpdate(id=id, status="completed") as status_update:
                     running_tasks.pop(id)
-                    scheduler_queue.put(
-                        StatusUpdate(id=id, task_inst=task_inst, status="completed")
-                    )
+                    scheduler_queue.put(status_update)
 
-                case KillTask(id=task_id):
-                    log(f"executor={id} kill task={task_id}")
-                    process = running_tasks.pop(task_id, None)
+                case KillTask() as kill_task:
+                    log(f"executor={id} kill task={kill_task.id}")
+                    process = running_tasks.pop(kill_task.id, None)
                     if process is None:
-                        log(f"executor={id} task={task_id} not found")
+                        log(f"executor={id} task={kill_task.id} not found")
                         continue
                     process.interrupt({"cause": "killed"})
                     # scheduler_queue.put(StatusUpdate(kill_task, "killed"))
                 case _:
-                    log(f"executor={id} unknown message={msg}")
+                    log(f"executor={id} unknown message={msg!r}")
 
     def scheduler():
         taskid = 0
-        running_tasks = set()
+        running_tasks: Mapping[int, LaunchTask] = {}
 
         def nextid():
             nonlocal taskid
@@ -95,61 +90,62 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
             ) != []:
                 stage, task = runnable_tasks.pop(0)
                 stage.status, task.status = "running", "running"
-                task_instance = TaskInstance(
+                launch_task = LaunchTask(
                     id=nextid(),
                     executor_id=executor.id,
                     task=task,
                     status="running",
                 )
-                running_tasks.add(task_instance.id)
-                executor.running_tasks[task_instance.id] = task_instance
-                print(f"launching task {task_instance.id}")
-                yield executor.queue.put(LaunchTask(task_inst=task_instance))
+                running_tasks[launch_task.id] = launch_task
+                executor.running_tasks[launch_task.id] = launch_task
+                yield executor.queue.put(launch_task)
                 executor.available_slots -= 1
-            print("scheduler waiting")
             event = yield scheduler_queue.get()
             match event:
                 case Executor(id=id) as executor:
-                    print(f"{env.now}: register executor {id}")
+                    log(f"register executor {id}")
                     executors[id] = executor
                 case KillExecutor(id=id):
-                    print(f"{env.now}: kill executor {id}")
+                    log(f"kill executor {id}")
                     executor = executors[id]
-                    for taskinst in executor.running_tasks.values():
-                        DAG[taskinst.task.stage_id].tasks[taskinst.task.index].status = "killed"
-                        running_tasks.remove(taskinst.id)
+                    for launched_task in executor.running_tasks.values():
+                        DAG[launched_task.task.stage_id].tasks[
+                            launched_task.task.index
+                        ].status = "killed"
+                        running_tasks.pop(launched_task.id)
                     del executors[id]
-                case FetchFailed(LaunchTask(task_inst=task_inst), dep):
-                    stage = DAG[task_inst.task.stage_id]
+                # fix it
+                case FetchFailed(launch_task=LaunchTask(launch_task=launched_task)):
+                    stage = DAG[launched_task.task.stage_id]
                     # always reset the current stage.
                     stage.status = "pending"
                     for task in stage.tasks:
                         task.status = "pending"
                         # send KillTask message to all instances?
-                        task.instances = {}
+                        task.launched_tasks = {}
                     # mark deps as failed (all or some?)
                     for dep in stage.deps:
                         DAG[dep].status = "failed"
                         for task in DAG[dep].tasks:
                             # not all task need to be reset?
                             task.status = "pending"
-                    print(f"{env.now}: fetch failed for task={task_inst.id} for dep={dep}")
-                case StatusUpdate(id=id, task_inst=task_inst, status="completed"):
-                    print(f"{env.now}: status update {task_inst.id} completed")
-                    if id not in running_tasks:
+                    log(f"fetch failed for task={launched_task.id} for dep={dep}")
+                case StatusUpdate(id=id, status="completed"):
+                    log(f"status update task={id} completed")
+                    launched_task = running_tasks.pop(id, None)
+                    if launched_task is None:
                         log(f"status update {id} completed but not in running tasks")
                         continue
                     # update task status
-                    stage = DAG[task_inst.task.stage_id]
-                    task_inst.task.status = "completed"
-                    task_inst.task.current.add(id)
+                    stage = DAG[launched_task.task.stage_id]
+                    launched_task.task.status = "completed"
+                    launched_task.task.current.add(id)
                     # update stage status
                     if all(task.status == "completed" for task in stage.tasks):
                         stage.status = "completed"
-                    executor = executors[task_inst.executor_id]
+                    executor = executors[launched_task.executor_id]
                     executor.available_slots += 1
-                    executor.running_tasks.pop(task_inst.id)
-                    running_tasks.remove(task_inst.id)
+                    executor.running_tasks.pop(launched_task.id)
 
     log(f"starting {E} executors")
     for i in range(E):
@@ -170,7 +166,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
     start_time = env.now
     env.run()
     end_time = env.now
-    print(f"Total time taken: {end_time - start_time}")
+    log(f"Total time taken: {end_time - start_time}")
 
 
 if __name__ == "__main__":

@@ -19,13 +19,13 @@ class Task(BaseModel):
     status: str
     stage_id: int
     current: set[int] = set()
-    instances: Mapping[int, "TaskInstance"] = {}
+    launched_tasks: Mapping[int, "LaunchTask"] = {}
 
     def __repr__(self):
-        return f"Task(index={self.index}, status={self.status}, stage_id={self.stage_id}, instances={len(self.instances)})"
+        return f"Task(stage={self.stage_id}, index={self.index}, status={self.status})"
 
 
-class TaskInstance(BaseModel):
+class LaunchTask(BaseModel):
     id: int
     executor_id: int
     task: Task
@@ -35,20 +35,7 @@ class TaskInstance(BaseModel):
         return self.task.stage_id
 
     def __repr__(self):
-        return f"TaskInstance(id={self.id}, executor_id={self.executor_id}, task={self.task}, status={self.status})"
-
-
-class LaunchTask(BaseModel):
-    task_inst: TaskInstance
-
-    def task_id(self):
-        return self.task_inst.id
-
-    def stage_id(self):
-        return self.task_inst.task.stage_id
-
-    def __repr__(self):
-        return f"LaunchTask(id={self.task_inst.id}, index={self.task_inst.task.index}, stage_id={self.task_inst.task.stage_id})"
+        return f"LaunchTask(id={self.id}, executor_id={self.executor_id}, status={self.status}, task={self.task!r})"
 
 
 class KillTask(BaseModel):
@@ -57,18 +44,14 @@ class KillTask(BaseModel):
 
 class StatusUpdate(BaseModel):
     id: int
-    task_inst: TaskInstance
     status: str
 
-    def task_id(self):
-        return self.task_inst.id
-
     def __repr__(self):
-        return f"StatusUpdate(id={self.task_inst.id}, index={self.task_inst.task.index}, stage_id={self.task_inst.task.stage_id}, status={self.status})"
+        return f"StatusUpdate(id={self.id}, status={self.status})"
 
 
 class FetchFailed(BaseModel):
-    launch_task_ref: LaunchTask
+    launch_task: LaunchTask
     dep: int
 
     def __repr__(self):
@@ -81,7 +64,7 @@ class Executor(BaseModel):
     available_slots: int
     process: Any  # simpy process
     queue: Any
-    running_tasks: Mapping[int, "TaskInstance"] = {}
+    running_tasks: Mapping[int, "LaunchTask"] = {}
 
 
 class KillExecutor(BaseModel):
