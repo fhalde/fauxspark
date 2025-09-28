@@ -8,3 +8,6 @@ dependencies = [
     "networkx>=3.5",
     "simpy>=4.1.1",
 ]
+
+[tool.ruff]
+line-length = 100

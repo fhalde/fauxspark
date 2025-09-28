@@ -18,6 +18,7 @@ class Task(BaseModel):
     index: int
     status: str
     stage_id: int
+    current: set[int] = set()
     instances: Mapping[int, "TaskInstance"] = {}
 
     def __repr__(self):
@@ -30,15 +31,24 @@ class TaskInstance(BaseModel):
     task: Task
     status: str
 
+    def stage_id(self):
+        return self.task.stage_id
+
     def __repr__(self):
         return f"TaskInstance(id={self.id}, executor_id={self.executor_id}, task={self.task}, status={self.status})"
 
 
 class LaunchTask(BaseModel):
-    task: Task
+    task_inst: TaskInstance
+
+    def task_id(self):
+        return self.task_inst.id
+
+    def stage_id(self):
+        return self.task_inst.task.stage_id
 
     def __repr__(self):
-        return f"LaunchTask(id={self.task['id']}, index={self.task['index']}, stage_id={self.task['stage_id']})"
+        return f"LaunchTask(id={self.task_inst.id}, index={self.task_inst.task.index}, stage_id={self.task_inst.task.stage_id})"
 
 
 class KillTask(BaseModel):
@@ -46,11 +56,15 @@ class KillTask(BaseModel):
 
 
 class StatusUpdate(BaseModel):
-    launch_task_ref: LaunchTask
+    id: int
+    task_inst: TaskInstance
     status: str
 
+    def task_id(self):
+        return self.task_inst.id
+
     def __repr__(self):
-        return f"StatusUpdate(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.task['stage_id']}, status={self.status})"
+        return f"StatusUpdate(id={self.task_inst.id}, index={self.task_inst.task.index}, stage_id={self.task_inst.task.stage_id}, status={self.status})"
 
 
 class FetchFailed(BaseModel):
@@ -58,21 +72,17 @@ class FetchFailed(BaseModel):
     dep: int
 
     def __repr__(self):
-        return f"FetchFailed(id={self.launch_task_ref.task['id']}, index={self.launch_task_ref.task['index']}, stage_id={self.launch_task_ref.task['stage_id']}, dep={self.dep})"
+        return f"FetchFailed(id={self.launch_task_ref.task_inst.id}, index={self.launch_task_ref.task_inst.task.index}, stage_id={self.launch_task_ref.task_inst.task.stage_id}, dep={self.dep})"
 
 
-class RegisterExecutor(BaseModel):
+class Executor(BaseModel):
     id: int
     cores: int
     available_slots: int
-    instance: Any  # simpy process
+    process: Any  # simpy process
     queue: Any
-    running_tasks: Mapping[int, "Task"] = {}
+    running_tasks: Mapping[int, "TaskInstance"] = {}
 
 
 class KillExecutor(BaseModel):
-    id: int
-
-
-class KillTask(BaseModel):
     id: int
