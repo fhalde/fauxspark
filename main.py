@@ -137,11 +137,11 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 case KillExecutor(id=id):
                     log(f"kill executor {id}")
                     executor = executors[id]
-                    # interrupt all fetch requests
                     for launched_task in executor.running_tasks.values():
+                        id = launched_task.id
                         task = launched_task.task
                         task.status, launched_task.status = "killed", "killed"
-                        running_tasks.pop(launched_task.id)
+                        running_tasks.pop(id)
                     for shuffle_process in executor.running_shuffles.values():
                         if shuffle_process.is_alive:
                             shuffle_process.interrupt()
@@ -169,12 +169,13 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                         log(f"status update task={id} completed")
                         task = launched_task.task
                         task.status, task.current = "completed", id
-                        stage = DAG[launched_task.stage_id()]
+                        stage = DAG[task.stage_id]
                         if all(task.status == "completed" for task in stage.tasks):
                             stage.status = "completed"
-                        executor = executors[launched_task.executor_id]
-                        executor.available_slots += 1
-                        executor.running_tasks.pop(launched_task.id)
+                        executor = executors.get(launched_task.executor_id, None)
+                        if executor is not None:
+                            executor.available_slots += 1
+                            executor.running_tasks.pop(launched_task.id)
                     else:
                         log(f"status update {id} completed but not in running tasks")
 
