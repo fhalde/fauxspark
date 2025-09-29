@@ -60,7 +60,7 @@ class FetchFailed(BaseModel):
         return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.id}, dep={self.dep})"
 
 
-class Executor(BaseModel):
+class RegisterExecutor(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     id: int
     cores: int
@@ -70,6 +70,12 @@ class Executor(BaseModel):
     running_tasks: Mapping[int, "LaunchTask"] = Field(default_factory=dict)
     running_shuffles: Mapping[int, simpy.Process] = Field(default_factory=dict)
 
+    def __repr__(self):
+        return f"{Fore.GREEN}Executor{Style.RESET_ALL}(id={self.id}, cores={self.cores}, available_slots={self.available_slots})"
+
 
 class KillExecutor(BaseModel):
     id: int
+
+    def __repr__(self):
+        return f"{Fore.RED}KillExecutor{Style.RESET_ALL}(id={self.id})"

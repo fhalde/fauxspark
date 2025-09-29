@@ -4,7 +4,7 @@ import simpy
 from colorama import init, Fore, Style
 from typing import Mapping
 from models import (
-    Executor,
+    RegisterExecutor,
     Stage,
     LaunchTask,
     KillTask,
@@ -24,7 +24,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
 
     print("fauxspark!")
     scheduler_queue = simpy.Store(env)
-    executors: Mapping[int, Executor] = {}
+    executors: Mapping[int, RegisterExecutor] = {}
 
     def next_available_executor():
         for executor in executors.values():
@@ -54,7 +54,6 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
             try:
                 yield env.timeout(stats["shuffle"]["avg"])
             except simpy.Interrupt as e:
-                log(f"[executor-{eid}]", f"interrupted shuffle={dep} cause={e}")
                 if e.cause == "fetchfailed":
                     raise FetchFailedException(dep)
 
@@ -78,14 +77,13 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 yield env.timeout(DAG[launch_task.task.stage_id].stats["avg"])
                 yield executor_queue.put(StatusUpdate(id=launch_task.id, status="completed"))
             except FetchFailedException as e:
-                log(f"[executor-{eid}]", f"{FetchFailed(id=launch_task.id, dep=e.dep)!r}")
                 yield executor_queue.put(FetchFailed(id=launch_task.id, dep=e.dep))
 
         while True:
             msg = yield executor_queue.get()
+            log(f"[executor-{eid}]", f"{msg!r}")
             match msg:
                 case LaunchTask() as launch_task:
-                    log(f"[executor-{eid}]", f"{launch_task!r}")
                     running_tasks[launch_task.id] = env.process(thread(launch_task))
 
                 case StatusUpdate(id=id, status="completed") as status_update:
@@ -97,7 +95,6 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                     yield scheduler_queue.put(fetch_failed)
 
                 case KillTask() as kill_task:
-                    log(f"[executor-{eid}]", f"kill task={kill_task.id}")
                     process = running_tasks.pop(kill_task.id, None)
                     if process is None:
                         log(f"[executor-{eid}]", f"task={kill_task.id} not found")
@@ -105,7 +102,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                     process.interrupt("killed")
                     yield scheduler_queue.put(StatusUpdate(kill_task, "killed"))
                 case _:
-                    log(f"[executor-{eid}]", f"unknown message={msg!r}")
+                    log(f"[executor-{eid}]", f"unhandled: {msg!r}")
 
     def scheduler():
         taskid = 0
@@ -137,17 +134,18 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 yield executor.queue.put(launch_task)
                 executor.available_slots -= 1
             event = yield scheduler_queue.get()
+            log("[scheduler]", f"{event!r}")
             match event:
-                case Executor(id=id) as executor:
-                    log("[scheduler]", f"register executor {id}")
+                case RegisterExecutor(id=id) as executor:
                     executors[id] = executor
 
                 case KillExecutor(id=id):
-                    log("[scheduler]", f"kill executor {id}")
                     executor = executors[id]
                     for launched_task in executor.running_tasks.values():
                         tid = launched_task.id
+                        log("[scheduler]", f"killing task {tid}")
                         task = launched_task.task
+                        task.current = None
                         task.status, launched_task.status = "killed", "killed"
                         running_tasks.pop(tid)
                     for shuffle_process in executor.running_shuffles.values():
@@ -169,43 +167,46 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                             last_execution = task.launched_tasks[task.current]
                             if last_execution.executor_id not in executors:
                                 task.status, task.current = "pending", None
+                        executor = executors.get(launch_task.executor_id)
+                        if executor:
+                            executor.available_slots += 1
+                            executor.running_tasks.pop(id, None)
+                    else:
+                        log("[scheduler]", f"too old fetch failed task={id} dep={dep}")
 
                 case StatusUpdate(id=id, status="completed"):
                     launched_task = running_tasks.pop(id, None)
                     if launched_task is not None and launched_task.task.current == id:
-                        log("[scheduler]", f"status update task={id} completed")
                         task = launched_task.task
                         task.status, task.current = "completed", id
                         stage = DAG[task.stage_id]
                         if all(task.status == "completed" for task in stage.tasks):
                             stage.status = "completed"
-                        executor = executors.get(launched_task.executor_id, None)
-                        if executor is not None:
+                        executor = executors.get(launched_task.executor_id)
+                        if executor:
                             executor.available_slots += 1
                             executor.running_tasks.pop(launched_task.id)
                     else:
-                        log("[scheduler]", f"status update {id} completed but not in running tasks")
+                        log("[scheduler]", f"too old status update {id}")
 
                 case _:
-                    log("[scheduler]", f"unknown message={event!r}")
+                    log("[scheduler]", f"unhandled: {event!r}")
 
     log("[main]", f"starting {E} executors...")
 
-    def start_executor(i):
-        return scheduler_queue.put(
-            Executor(
-                id=i,
-                cores=cores,
-                available_slots=cores,
-                process=env.process(executor(i, (queue := simpy.Store(env)))),
-                queue=queue,
-                running_tasks={},
-            )
+    def mk_executor(i):
+        return RegisterExecutor(
+            id=i,
+            cores=cores,
+            available_slots=cores,
+            process=env.process(executor(i, (queue := simpy.Store(env)))),
+            queue=queue,
+            running_tasks={},
         )
 
     def start_executors():
         for i in range(E):
-            yield start_executor(i)
+            yield scheduler_queue.put(mk_executor(i))
 
     log("[main]", "starting executors...")
     env.process(start_executors())
@@ -216,7 +217,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
     def killer():
         yield env.timeout(72)
         yield scheduler_queue.put(KillExecutor(id=0))
-        yield scheduler_queue.put(start_executor(1))
+        yield scheduler_queue.put(mk_executor(1))
 
     env.process(killer())
 
