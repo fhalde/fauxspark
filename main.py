@@ -66,16 +66,16 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                         yield executor_queue.put(FetchFailed(tid=tid, dep=dep, eid=eid))
                         return
                     for task in DAG[dep].tasks:
-                        executor_id = task.launched_tasks[task.current].eid
-                        if executor_id not in executors:
+                        target = task.launched_tasks[task.current].eid
+                        if target not in executors:
                             yield executor_queue.put(FetchFailed(tid=tid, dep=dep, eid=eid))
                             return
                         shuffle_process = env.process(
                             read_shuffle(DAG[launch_task.stage_id()].stats, dep)
                         )
-                        executors[executor_id].running_shuffles[launch_task.tid] = shuffle_process
+                        executors[eid].running_shuffles[tid] = shuffle_process
                         yield shuffle_process
-                yield env.timeout(DAG[launch_task.task.stage_id].stats["avg"])
+                yield env.timeout(DAG[launch_task.stage_id()].stats["avg"])
                 yield executor_queue.put(StatusUpdate(tid=tid, status="completed", eid=eid))
             except FetchFailedException as e:
                 yield executor_queue.put(FetchFailed(tid=tid, dep=e.dep, eid=eid))
