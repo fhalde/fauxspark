@@ -58,57 +58,52 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                     raise FetchFailedException(dep)
 
         def thread(launch_task: LaunchTask):
+            tid = launch_task.tid
             try:
                 deps = DAG[launch_task.stage_id()].deps
                 for dep in deps:
                     if DAG[dep].status != "completed":
-                        yield executor_queue.put(
-                            FetchFailed(id=launch_task.id, dep=dep, executor_id=eid)
-                        )
+                        yield executor_queue.put(FetchFailed(tid=tid, dep=dep, eid=eid))
                         return
                     for task in DAG[dep].tasks:
-                        executor_id = task.launched_tasks[task.current].executor_id
+                        executor_id = task.launched_tasks[task.current].eid
                         if executor_id not in executors:
-                            yield executor_queue.put(
-                                FetchFailed(id=launch_task.id, dep=dep, executor_id=eid)
-                            )
+                            yield executor_queue.put(FetchFailed(tid=tid, dep=dep, eid=eid))
                             return
                         shuffle_process = env.process(
                             read_shuffle(DAG[launch_task.stage_id()].stats, dep)
                         )
-                        executors[executor_id].running_shuffles[launch_task.id] = shuffle_process
+                        executors[executor_id].running_shuffles[launch_task.tid] = shuffle_process
                         yield shuffle_process
                 yield env.timeout(DAG[launch_task.task.stage_id].stats["avg"])
-                yield executor_queue.put(
-                    StatusUpdate(id=launch_task.id, status="completed", executor_id=eid)
-                )
+                yield executor_queue.put(StatusUpdate(tid=tid, status="completed", eid=eid))
             except FetchFailedException as e:
-                yield executor_queue.put(FetchFailed(id=launch_task.id, dep=e.dep, executor_id=eid))
+                yield executor_queue.put(FetchFailed(tid=tid, dep=e.dep, eid=eid))
 
         while True:
-            msg = yield executor_queue.get()
-            log(f"executor-{eid}", f"{msg!r}")
-            match msg:
-                case LaunchTask() as launch_task:
-                    running_tasks[launch_task.id] = env.process(thread(launch_task))
+            event = yield executor_queue.get()
+            log(f"executor-{eid}", f"{event!r}")
+            match event:
+                case LaunchTask(tid=tid):
+                    running_tasks[tid] = env.process(thread(event))
 
-                case StatusUpdate(id=id, status="completed") as status_update:
-                    running_tasks.pop(id, None)
-                    yield scheduler_queue.put(status_update)
+                case StatusUpdate(tid=tid, status="completed"):
+                    running_tasks.pop(tid, None)
+                    yield scheduler_queue.put(event)
 
-                case FetchFailed(id=id) as fetch_failed:
-                    running_tasks.pop(id, None)
-                    yield scheduler_queue.put(fetch_failed)
+                case FetchFailed(tid=tid):
+                    running_tasks.pop(tid, None)
+                    yield scheduler_queue.put(event)
 
-                case KillTask() as kill_task:
-                    process = running_tasks.pop(kill_task.id, None)
+                case KillTask(tid=tid):
+                    process = running_tasks.pop(tid, None)
                     if process is None:
-                        log(f"executor-{eid}", f"task={kill_task.id} not found")
+                        log(f"executor-{eid}", f"task={tid} not found")
                         continue
                     process.interrupt("killed")
-                    yield scheduler_queue.put(StatusUpdate(kill_task, "killed"))
+                    yield scheduler_queue.put(StatusUpdate(tid=tid, status="killed", eid=eid))
                 case _:
-                    log(f"executor-{eid}", f"unhandled: {msg!r}")
+                    log(f"executor-{eid}", f"unhandled: {event!r}")
 
     def scheduler():
         taskid = 0
@@ -126,8 +121,8 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 stage, task = runnable_tasks.pop(0)
                 stage.status, task.status = "running", "running"
                 launch_task = LaunchTask(
-                    id=(id := nextid()),
-                    executor_id=executor.id,
+                    tid=(id := nextid()),
+                    eid=executor.id,
                     task=task,
                     status="running",
                 )
@@ -144,20 +139,20 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
             executors[register_executor.id] = register_executor
 
         def kill_executor(kill_executor: KillExecutor):
-            executor = executors[kill_executor.id]
+            executor = executors[kill_executor.eid]
             for launched_task in executor.running_tasks.values():
-                log("scheduler", f"killing task {launched_task.id}")
+                log("scheduler", f"killing task {launched_task.tid}")
                 task = launched_task.task
                 task.current, task.status = None, "killed"
                 launched_task.status = "killed"
-                running_tasks.pop(launched_task.id)
+                running_tasks.pop(launched_task.tid)
             for shuffle_process in executor.running_shuffles.values():
                 if shuffle_process.is_alive:
                     shuffle_process.interrupt("fetchfailed")
             del executors[executor.id]
 
         def fetch_failed(fetch_failed: FetchFailed):
-            tid = fetch_failed.id
+            tid = fetch_failed.tid
             if tid in running_tasks:
                 launch_task = running_tasks.pop(tid)
                 task = launch_task.task
@@ -168,9 +163,9 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 parent_stage = DAG[fetch_failed.dep]
                 parent_stage.status = "failed"
                 for task in parent_stage.tasks:
-                    if task.launched_tasks[task.current].executor_id not in executors:
+                    if task.launched_tasks[task.current].eid not in executors:
                         task.status, task.current = "pending", None
-                executor = executors.get(launch_task.executor_id)
+                executor = executors.get(launch_task.eid)
                 if executor:
                     executor.available_slots += 1
                     executor.running_tasks.pop(tid, None)
@@ -178,7 +173,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 log("scheduler", f"{Fore.MAGENTA}stale {fetch_failed!r}")
 
         def status_update(status_update: StatusUpdate):
-            tid = status_update.id
+            tid = status_update.tid
             launched_task = running_tasks.pop(tid, None)
             if launched_task and launched_task.task.current == tid:
                 task = launched_task.task
@@ -186,7 +181,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 stage = DAG[task.stage_id]
                 if all(task.status == "completed" for task in stage.tasks):
                     stage.status = "completed"
-                executor = executors.get(launched_task.executor_id)
+                executor = executors.get(launched_task.eid)
                 if executor:
                     executor.available_slots += 1
                     executor.running_tasks.pop(tid)
@@ -237,7 +232,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
 
     def killer():
         yield env.timeout(72)
-        yield scheduler_queue.put(KillExecutor(id=0))
+        yield scheduler_queue.put(KillExecutor(eid=0))
         yield scheduler_queue.put(mk_executor(1))
 
     env.process(killer())

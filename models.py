@@ -28,8 +28,8 @@ class Task(BaseModel):
 
 
 class LaunchTask(BaseModel):
-    id: int
-    executor_id: int
+    tid: int
+    eid: int
     task: "Task"
     status: str
 
@@ -37,29 +37,29 @@ class LaunchTask(BaseModel):
         return self.task.stage_id
 
     def __repr__(self):
-        return f"{Fore.YELLOW}LaunchTask{Style.RESET_ALL}(id={self.id}, executor_id={self.executor_id}, status={self.status}, task={self.task!r})"
+        return f"{Fore.YELLOW}LaunchTask{Style.RESET_ALL}(id={self.tid}, executor_id={self.eid}, status={self.status}, task={self.task!r})"
 
 
 class KillTask(BaseModel):
-    id: int
+    tid: int
 
 
 class StatusUpdate(BaseModel):
-    id: int
+    tid: int
     status: str
-    executor_id: int
+    eid: int
 
     def __repr__(self):
-        return f"{Fore.BLUE}StatusUpdate{Style.RESET_ALL}(id={self.id}, status={self.status}, executor_id={self.executor_id})"
+        return f"{Fore.BLUE}StatusUpdate{Style.RESET_ALL}(id={self.tid}, status={self.status}, executor_id={self.eid})"
 
 
 class FetchFailed(BaseModel):
-    id: int
+    tid: int
     dep: int
-    executor_id: int
+    eid: int
 
     def __repr__(self):
-        return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.id}, dep={self.dep}, executor_id={self.executor_id})"
+        return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.tid}, dep={self.dep}, executor_id={self.eid})"
 
 
 class RegisterExecutor(BaseModel):
@@ -77,7 +77,7 @@ class RegisterExecutor(BaseModel):
 
 
 class KillExecutor(BaseModel):
-    id: int
+    eid: int
 
     def __repr__(self):
-        return f"{Fore.RED}KillExecutor{Style.RESET_ALL}(id={self.id})"
+        return f"{Fore.RED}KillExecutor{Style.RESET_ALL}(id={self.eid})"
