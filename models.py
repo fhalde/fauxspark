@@ -52,6 +52,7 @@ class StatusUpdate(BaseModel):
 
 
 class FetchFailed(BaseModel):
+    id: int
     launch_task: LaunchTask
     dep: int
 

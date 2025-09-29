@@ -110,47 +110,49 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 case Executor(id=id) as executor:
                     log(f"register executor {id}")
                     executors[id] = executor
+
                 case KillExecutor(id=id):
                     log(f"kill executor {id}")
                     executor = executors[id]
                     for launched_task in executor.running_tasks.values():
-                        DAG[launched_task.task.stage_id].tasks[
-                            launched_task.task.index
-                        ].status = "killed"
+                        task = launched_task.task
+                        task.status = "killed"
+                        launched_task.status = "killed"
                         running_tasks.pop(launched_task.id)
                     del executors[id]
-                # fix it
-                case FetchFailed(launch_task=LaunchTask(launch_task=launched_task)):
-                    stage = DAG[launched_task.task.stage_id]
-                    # always reset the current stage.
-                    stage.status = "pending"
-                    for task in stage.tasks:
-                        task.status = "pending"
-                        # send KillTask message to all instances?
-                        task.launched_tasks = {}
-                    # mark deps as failed (all or some?)
-                    for dep in stage.deps:
-                        DAG[dep].status = "failed"
-                        for task in DAG[dep].tasks:
-                            # not all task need to be reset?
+
+                case FetchFailed(id=id, dep=dep):
+                    if id in running_tasks:
+                        launch_task = running_tasks.pop(id)
+                        task = launch_task.task
+                        stage = DAG[task.stage_id]
+                        stage.status = "pending"
+                        for task in stage.tasks:
                             task.status = "pending"
-                    log(f"fetch failed for task={launched_task.id} for dep={dep}")
+                            task.current = set()
+                            task.launched_tasks = {}
+                        for dep in stage.deps:
+                            DAG[dep].status = "failed"
+                            for task in DAG[dep].tasks:
+                                task.status = "pending"
+                                task.current = set()
+                                task.launched_tasks = {}
+
                 case StatusUpdate(id=id, status="completed"):
-                    log(f"status update task={id} completed")
-                    launched_task = running_tasks.pop(id, None)
-                    if launched_task is None:
+                    if id in running_tasks:
+                        log(f"status update task={id} completed")
+                        launched_task: LaunchTask = running_tasks.pop(id)
+                        task: Task = launched_task.task
+                        stage: Stage = DAG[task.stage_id]
+                        task.status = "completed"
+                        task.current.add(id)
+                        if all(task.status == "completed" for task in stage.tasks):
+                            stage.status = "completed"
+                        executor = executors[launched_task.executor_id]
+                        executor.available_slots += 1
+                        executor.running_tasks.pop(launched_task.id)
+                    else:
                         log(f"status update {id} completed but not in running tasks")
-                        continue
-                    # update task status
-                    stage = DAG[launched_task.task.stage_id]
-                    launched_task.task.status = "completed"
-                    launched_task.task.current.add(id)
-                    # update stage status
-                    if all(task.status == "completed" for task in stage.tasks):
-                        stage.status = "completed"
-                    executor = executors[launched_task.executor_id]
-                    executor.available_slots += 1
-                    executor.running_tasks.pop(launched_task.id)
 
     log(f"starting {E} executors")
     for i in range(E):
@@ -174,4 +176,4 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
 
 if __name__ == "__main__":
     os.environ["PYTHONUNBUFFERED"] = "1"
-    main(DAG=[Stage.model_validate(stage) for stage in json.load(open("dag.json"))])
+    main(DAG=[Stage.model_validate(stage) for stage in json.load(open("dag.json"))], E=10, cores=10)
