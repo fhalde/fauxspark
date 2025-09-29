@@ -20,7 +20,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
 
     def log(component, msg):
         nonlocal env
-        print(f"{Style.BRIGHT}{Fore.RED}{env.now:6.2f}{Style.RESET_ALL}: {component:<13} {msg}")
+        print(f"{Style.BRIGHT}{Fore.RED}{env.now:6.2f}{Style.RESET_ALL}: [{component:<12}] {msg}")
 
     print("fauxspark!")
     scheduler_queue = simpy.Store(env)
@@ -81,7 +81,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
 
         while True:
             msg = yield executor_queue.get()
-            log(f"[executor-{eid}]", f"{msg!r}")
+            log(f"executor-{eid}", f"{msg!r}")
             match msg:
                 case LaunchTask() as launch_task:
                     running_tasks[launch_task.id] = env.process(thread(launch_task))
@@ -97,12 +97,12 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 case KillTask() as kill_task:
                     process = running_tasks.pop(kill_task.id, None)
                     if process is None:
-                        log(f"[executor-{eid}]", f"task={kill_task.id} not found")
+                        log(f"executor-{eid}", f"task={kill_task.id} not found")
                         continue
                     process.interrupt("killed")
                     yield scheduler_queue.put(StatusUpdate(kill_task, "killed"))
                 case _:
-                    log(f"[executor-{eid}]", f"unhandled: {msg!r}")
+                    log(f"executor-{eid}", f"unhandled: {msg!r}")
 
     def scheduler():
         taskid = 0
@@ -134,7 +134,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 yield executor.queue.put(launch_task)
                 executor.available_slots -= 1
             event = yield scheduler_queue.get()
-            log("[scheduler]", f"{event!r}")
+            log("scheduler", f"{event!r}")
             match event:
                 case RegisterExecutor(id=id) as executor:
                     executors[id] = executor
@@ -143,7 +143,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                     executor = executors[id]
                     for launched_task in executor.running_tasks.values():
                         tid = launched_task.id
-                        log("[scheduler]", f"killing task {tid}")
+                        log("scheduler", f"killing task {tid}")
                         task = launched_task.task
                         task.current = None
                         task.status, launched_task.status = "killed", "killed"
@@ -172,7 +172,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                             executor.available_slots += 1
                             executor.running_tasks.pop(id, None)
                     else:
-                        log("[scheduler]", f"too old fetch failed task={id} dep={dep}")
+                        log("scheduler", f"{Fore.MAGENTA}stale {event!r}")
 
                 case StatusUpdate(id=id, status="completed"):
                     launched_task = running_tasks.pop(id, None)
@@ -187,12 +187,12 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                             executor.available_slots += 1
                             executor.running_tasks.pop(launched_task.id)
                     else:
-                        log("[scheduler]", f"too old status update {id}")
+                        log("scheduler", f"{Fore.MAGENTA}stale {event!r}")
 
                 case _:
-                    log("[scheduler]", f"unhandled: {event!r}")
+                    log("scheduler", f"unhandled: {event!r}")
 
-    log("[main]", f"starting {E} executors...")
+    log("main", f"starting {E} executors...")
 
     def mk_executor(i):
         return RegisterExecutor(
@@ -208,10 +208,10 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
         for i in range(E):
             yield scheduler_queue.put(mk_executor(i))
 
-    log("[main]", "starting executors...")
+    log("main", "starting executors...")
     env.process(start_executors())
 
-    log("[main]", "starting scheduler")
+    log("main", "starting scheduler")
     env.process(scheduler())
 
     def killer():
@@ -222,10 +222,10 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
     env.process(killer())
 
     env.run()
-    log("[main]", "simulation completed")
+    log("main", "simulation completed")
 
 
 if __name__ == "__main__":
     init(autoreset=True)
     os.environ["PYTHONUNBUFFERED"] = "1"
-    main(DAG=[Stage.model_validate(stage) for stage in json.load(open("dag.json"))], E=1, cores=1)
+    main(DAG=[Stage.model_validate(stage) for stage in json.load(open("dag.json"))], E=2, cores=1)
