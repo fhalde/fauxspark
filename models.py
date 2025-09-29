@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, List, Mapping
+from typing import Any, List, Mapping, Optional
 from colorama import Fore, Style
 
 
@@ -8,7 +8,7 @@ class Stage(BaseModel):
     deps: List[int]
     status: str
     partitions: int
-    stats: Mapping[str, float]
+    stats: Mapping[Any, Any]
     tasks: List["Task"]
 
     def __repr__(self):
@@ -19,7 +19,7 @@ class Task(BaseModel):
     index: int
     status: str
     stage_id: int
-    current: set[int] = set()
+    current: Optional[int] = None
     launched_tasks: Mapping[int, "LaunchTask"] = {}
 
     def __repr__(self):
@@ -29,7 +29,7 @@ class Task(BaseModel):
 class LaunchTask(BaseModel):
     id: int
     executor_id: int
-    task: Task
+    task: "Task"
     status: str
 
     def stage_id(self):
@@ -53,7 +53,7 @@ class StatusUpdate(BaseModel):
 
 class FetchFailed(BaseModel):
     id: int
-    launch_task: LaunchTask
+    launch_task: "LaunchTask"
     dep: int
 
     def __repr__(self):
@@ -67,6 +67,7 @@ class Executor(BaseModel):
     process: Any  # simpy process
     queue: Any
     running_tasks: Mapping[int, "LaunchTask"] = {}
+    running_shuffles: Mapping[int, Any] = {}
 
 
 class KillExecutor(BaseModel):
