@@ -47,17 +47,19 @@ class KillTask(BaseModel):
 class StatusUpdate(BaseModel):
     id: int
     status: str
+    executor_id: int
 
     def __repr__(self):
-        return f"{Fore.BLUE}StatusUpdate{Style.RESET_ALL}(id={self.id}, status={self.status})"
+        return f"{Fore.BLUE}StatusUpdate{Style.RESET_ALL}(id={self.id}, status={self.status}, executor_id={self.executor_id})"
 
 
 class FetchFailed(BaseModel):
     id: int
     dep: int
+    executor_id: int
 
     def __repr__(self):
-        return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.id}, dep={self.dep})"
+        return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.id}, dep={self.dep}, executor_id={self.executor_id})"
 
 
 class RegisterExecutor(BaseModel):

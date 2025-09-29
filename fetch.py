@@ -1,35 +1,14 @@
-import simpy
-from collections import defaultdict
-
-env = simpy.Environment()
-
-fetch = defaultdict(list)
-
-
-def shuffle():
-    yield env.timeout(10)
-    print("shuffle completed")
-
-
-def thread():
-    try:
-        fetchprocess = env.process(shuffle())
-        fetch[0].append(fetchprocess)
-        yield fetchprocess
-        print("thread completed")
-    except simpy.Interrupt:
-        print("interrupted")
-        return
+def x():
+    for x in range(3):
+        match x:
+            case 0:
+                z = 1
+            case 1:
+                print(z)
+                z = 2
+            case 2:
+                print(z)
+                z = 3
 
 
-def killer():
-    yield env.timeout(15)
-    for k, v in fetch.items():
-        for process in v:
-            if process.is_alive:
-                process.interrupt()
-
-
-env.process(thread())
-env.process(killer())
-env.run()
+x()
