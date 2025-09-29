@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, List, Mapping, Optional
 from colorama import Fore, Style
+import simpy
 
 
 class Stage(BaseModel):
@@ -20,7 +21,7 @@ class Task(BaseModel):
     status: str
     stage_id: int
     current: Optional[int] = None
-    launched_tasks: Mapping[int, "LaunchTask"] = {}
+    launched_tasks: Mapping[int, "LaunchTask"] = Field(default_factory=dict)
 
     def __repr__(self):
         return f"{Fore.GREEN}Task{Style.RESET_ALL}(stage={self.stage_id}, index={self.index}, status={self.status})"
@@ -53,21 +54,21 @@ class StatusUpdate(BaseModel):
 
 class FetchFailed(BaseModel):
     id: int
-    launch_task: "LaunchTask"
     dep: int
 
     def __repr__(self):
-        return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.launch_task.id}, executor_id={self.launch_task.executor_id}, dep={self.dep})"
+        return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.id}, dep={self.dep})"
 
 
 class Executor(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     id: int
     cores: int
     available_slots: int
-    process: Any  # simpy process
-    queue: Any
-    running_tasks: Mapping[int, "LaunchTask"] = {}
-    running_shuffles: Mapping[int, Any] = {}
+    process: simpy.Process  # simpy process
+    queue: simpy.Store  # simpy store
+    running_tasks: Mapping[int, "LaunchTask"] = Field(default_factory=dict)
+    running_shuffles: Mapping[int, simpy.Process] = Field(default_factory=dict)
 
 
 class KillExecutor(BaseModel):

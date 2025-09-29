@@ -18,9 +18,9 @@ from models import (
 def main(DAG: list[Stage] = [], E=1, cores=1):
     env = simpy.Environment()
 
-    def log(msg):
+    def log(component, msg):
         nonlocal env
-        print(f"{Style.BRIGHT}{Fore.RED}{env.now:6.2f}{Style.RESET_ALL}: {msg}")
+        print(f"{Style.BRIGHT}{Fore.RED}{env.now:6.2f}{Style.RESET_ALL}: {component:<13} {msg}")
 
     print("fauxspark!")
     scheduler_queue = simpy.Store(env)
@@ -43,15 +43,20 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                         acc.append([stage, task])
         return acc
 
-    def executor(id, executor_queue):
+    class FetchFailedException(Exception):
+        def __init__(self, dep: int):
+            self.dep = dep
+
+    def executor(eid, executor_queue):
         running_tasks = {}
 
         def read_shuffle(stats, dep: int):
             try:
                 yield env.timeout(stats["shuffle"]["avg"])
-            except simpy.Interrupt:
-                log(f"executor {id} interrupted shuffle={dep}")
-                return
+            except simpy.Interrupt as e:
+                log(f"[executor-{eid}]", f"interrupted shuffle={dep} cause={e}")
+                if e.cause == "fetchfailed":
+                    raise FetchFailedException(dep)
 
         def thread(launch_task: LaunchTask):
             try:
@@ -70,34 +75,37 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                         )
                         executors[executor_id].running_shuffles[launch_task.id] = shuffle_process
                         yield shuffle_process
-                        del executors[executor_id].running_shuffles[launch_task.id]
                 yield env.timeout(DAG[launch_task.task.stage_id].stats["avg"])
                 yield executor_queue.put(StatusUpdate(id=launch_task.id, status="completed"))
-            except simpy.Interrupt:
-                log(f"executor {id} interrupted task={launch_task!r}")
-                return
+            except FetchFailedException as e:
+                log(f"[executor-{eid}]", f"{FetchFailed(id=launch_task.id, dep=e.dep)!r}")
+                yield executor_queue.put(FetchFailed(id=launch_task.id, dep=e.dep))
 
         while True:
             msg = yield executor_queue.get()
             match msg:
                 case LaunchTask() as launch_task:
-                    log(f"executor={id} {launch_task!r}")
+                    log(f"[executor-{eid}]", f"{launch_task!r}")
                     running_tasks[launch_task.id] = env.process(thread(launch_task))
 
                 case StatusUpdate(id=id, status="completed") as status_update:
-                    running_tasks.pop(id)
+                    running_tasks.pop(id, None)
                     yield scheduler_queue.put(status_update)
 
+                case FetchFailed(id=id) as fetch_failed:
+                    running_tasks.pop(id, None)
+                    yield scheduler_queue.put(fetch_failed)
+
                 case KillTask() as kill_task:
-                    log(f"executor={id} kill task={kill_task.id}")
+                    log(f"[executor-{eid}]", f"kill task={kill_task.id}")
                     process = running_tasks.pop(kill_task.id, None)
                     if process is None:
-                        log(f"executor={id} task={kill_task.id} not found")
+                        log(f"[executor-{eid}]", f"task={kill_task.id} not found")
                         continue
-                    process.interrupt({"cause": "killed"})
-                    # scheduler_queue.put(StatusUpdate(kill_task, "killed"))
+                    process.interrupt("killed")
+                    yield scheduler_queue.put(StatusUpdate(kill_task, "killed"))
                 case _:
-                    log(f"executor={id} unknown message={msg!r}")
+                    log(f"[executor-{eid}]", f"unknown message={msg!r}")
 
     def scheduler():
         taskid = 0
@@ -131,21 +139,20 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
             event = yield scheduler_queue.get()
             match event:
                 case Executor(id=id) as executor:
-                    log(f"register executor {id}")
+                    log("[scheduler]", f"register executor {id}")
                     executors[id] = executor
 
                 case KillExecutor(id=id):
-                    log(f"kill executor {id}")
+                    log("[scheduler]", f"kill executor {id}")
                     executor = executors[id]
                     for launched_task in executor.running_tasks.values():
-                        id = launched_task.id
+                        tid = launched_task.id
                         task = launched_task.task
                         task.status, launched_task.status = "killed", "killed"
-                        running_tasks.pop(id)
+                        running_tasks.pop(tid)
                     for shuffle_process in executor.running_shuffles.values():
                         if shuffle_process.is_alive:
-                            shuffle_process.interrupt()
-                    executor.running_shuffles = {}
+                            shuffle_process.interrupt("fetchfailed")
                     del executors[id]
 
                 case FetchFailed(id=id, dep=dep):
@@ -166,7 +173,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 case StatusUpdate(id=id, status="completed"):
                     launched_task = running_tasks.pop(id, None)
                     if launched_task is not None and launched_task.task.current == id:
-                        log(f"status update task={id} completed")
+                        log("[scheduler]", f"status update task={id} completed")
                         task = launched_task.task
                         task.status, task.current = "completed", id
                         stage = DAG[task.stage_id]
@@ -177,38 +184,47 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                             executor.available_slots += 1
                             executor.running_tasks.pop(launched_task.id)
                     else:
-                        log(f"status update {id} completed but not in running tasks")
+                        log("[scheduler]", f"status update {id} completed but not in running tasks")
 
                 case _:
-                    log(f"scheduler unknown message={event!r}")
+                    log("[scheduler]", f"unknown message={event!r}")
 
-    log(f"starting {E} executors...")
+    log("[main]", f"starting {E} executors...")
 
-    def start_executor():
-        for i in range(E):
-            log(f"starting executor {i}")
-            yield scheduler_queue.put(
-                Executor(
-                    id=i,
-                    cores=cores,
-                    available_slots=cores,
-                    process=env.process(executor(i, (queue := simpy.Store(env)))),
-                    queue=queue,
-                    running_tasks={},
-                )
+    def start_executor(i):
+        return scheduler_queue.put(
+            Executor(
+                id=i,
+                cores=cores,
+                available_slots=cores,
+                process=env.process(executor(i, (queue := simpy.Store(env)))),
+                queue=queue,
+                running_tasks={},
             )
+        )
 
-    log("starting executors...")
-    env.process(start_executor())
+    def start_executors():
+        for i in range(E):
+            yield start_executor(i)
 
-    log("starting scheduler")
+    log("[main]", "starting executors...")
+    env.process(start_executors())
+
+    log("[main]", "starting scheduler")
     env.process(scheduler())
 
+    def killer():
+        yield env.timeout(72)
+        yield scheduler_queue.put(KillExecutor(id=0))
+        yield scheduler_queue.put(start_executor(1))
+
+    env.process(killer())
+
     env.run()
-    log("simulation completed")
+    log("[main]", "simulation completed")
 
 
 if __name__ == "__main__":
     init(autoreset=True)
     os.environ["PYTHONUNBUFFERED"] = "1"
-    main(DAG=[Stage.model_validate(stage) for stage in json.load(open("dag.json"))], E=10, cores=10)
+    main(DAG=[Stage.model_validate(stage) for stage in json.load(open("dag.json"))], E=1, cores=1)
