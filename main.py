@@ -120,6 +120,7 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                     task=task,
                     status="running",
                 )
+                task.current = id
                 task.launched_tasks[id], running_tasks[id], executor.running_tasks[id] = (
                     launch_task,
                     launch_task,
@@ -151,27 +152,24 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                     if id in running_tasks:
                         launch_task = running_tasks.pop(id)
                         task = launch_task.task
-                        stage = DAG[task.stage_id]
-                        stage.status = "pending"
-                        for task in stage.tasks:
-                            task.status = "pending"
-                            task.current = None
-                            task.launched_tasks = {}
-                        for dep in stage.deps:
-                            DAG[dep].status = "failed"
-                            for task in DAG[dep].tasks:
-                                task.status = "pending"
-                                task.current = None
-                                task.launched_tasks = {}
+                        current_stage = DAG[task.stage_id]
+                        current_stage.status = "pending"
+                        for task in current_stage.tasks:
+                            task.status, task.current = "pending", None
+                        parent_stage = DAG[dep]
+                        parent_stage.status = "failed"
+                        for task in parent_stage.tasks:
+                            last_execution = task.launched_tasks[task.current]
+                            if last_execution.executor_id not in executors:
+                                task.status, task.current = "pending", None
 
                 case StatusUpdate(id=id, status="completed"):
-                    if id in running_tasks:
+                    launched_task = running_tasks.pop(id, None)
+                    if launched_task is not None and launched_task.task.current == id:
                         log(f"status update task={id} completed")
-                        launched_task: LaunchTask = running_tasks.pop(id)
-                        task: Task = launched_task.task
-                        stage: Stage = DAG[task.stage_id]
-                        task.status = "completed"
-                        task.current = id
+                        task = launched_task.task
+                        task.status, task.current = "completed", id
+                        stage = DAG[launched_task.stage_id()]
                         if all(task.status == "completed" for task in stage.tasks):
                             stage.status = "completed"
                         executor = executors[launched_task.executor_id]
@@ -179,6 +177,9 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                         executor.running_tasks.pop(launched_task.id)
                     else:
                         log(f"status update {id} completed but not in running tasks")
+
+                case _:
+                    log(f"scheduler unknown message={event!r}")
 
     log(f"starting {E} executors...")
 
