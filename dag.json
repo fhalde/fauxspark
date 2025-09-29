@@ -1,23 +1,69 @@
-{
-    "0": {
-        "id": "0",
-        "deps": ["1"],
-        "status": "pending|in-progress|success",
+[
+    {
+        "id": 0,
+        "deps": [],
+        "status": "pending",
         "stats": {
-            "avg": 0.0,
-            "std": 0.0,
-            "var": 0.0,
-            "p50": 0.0,
-            "p75": 0.0,
-            "p95": 0.0
+            "avg": 5.0
         },
-        "partitions": 10,
+        "partitions": 2,
         "tasks": [
             {
-                "id": "0",
-                "executor-id": "executor-0",
-                "status": "pending|in-progress|success"
+                "index": 0,
+                "status": "pending",
+                "stage_id": 0,
+                "instances": {}
+            },
+            {
+                "index": 1,
+                "status": "pending",
+                "stage_id": 0,
+                "instances": {}
+            }
+        ]
+    },
+    {
+        "id": 1,
+        "deps": [0],
+        "status": "pending",
+        "stats": {
+            "shuffle": {
+                "avg": 5.0
+            },
+            "avg": 5.0
+        },
+        "partitions": 7,
+        "tasks": [
+            {
+                "index": 0,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            },
+            {
+                "index": 1,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            },
+            {
+                "index": 2,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            },
+            {
+                "index": 3,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
+            },
+            {
+                "index": 4,
+                "status": "pending",
+                "stage_id": 1,
+                "instances": {}
             }
         ]
     }
-}
+]
