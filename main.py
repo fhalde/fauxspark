@@ -152,9 +152,8 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
             del executors[executor.id]
 
         def fetch_failed(fetch_failed: FetchFailed):
-            tid = fetch_failed.tid
-            if tid in running_tasks:
-                launch_task = running_tasks.pop(tid)
+            launch_task = running_tasks.pop(fetch_failed.tid, None)
+            if launch_task:
                 task = launch_task.task
                 current_stage = DAG[task.stage_id]
                 current_stage.status = "pending"
@@ -168,23 +167,22 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
                 executor = executors.get(launch_task.eid)
                 if executor:
                     executor.available_slots += 1
-                    executor.running_tasks.pop(tid, None)
+                    executor.running_tasks.pop(launch_task.tid, None)
             else:
                 log("scheduler", f"{Fore.MAGENTA}stale {fetch_failed!r}")
 
         def status_update(status_update: StatusUpdate):
-            tid = status_update.tid
-            launched_task = running_tasks.pop(tid, None)
-            if launched_task and launched_task.task.current == tid:
+            launched_task = running_tasks.pop(status_update.tid, None)
+            if launched_task and launched_task.task.current == status_update.tid:
                 task = launched_task.task
-                task.status, task.current = "completed", tid
+                task.status, task.current = "completed", status_update.tid
                 stage = DAG[task.stage_id]
                 if all(task.status == "completed" for task in stage.tasks):
                     stage.status = "completed"
                 executor = executors.get(launched_task.eid)
                 if executor:
                     executor.available_slots += 1
-                    executor.running_tasks.pop(tid)
+                    executor.running_tasks.pop(status_update.tid)
             else:
                 log("scheduler", f"{Fore.MAGENTA}stale {status_update!r}")
 
