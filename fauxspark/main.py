@@ -1,5 +1,7 @@
 import json
 import os
+from typing import Generator
+import typing
 import simpy
 from colorama import Style, init, Fore
 from fauxspark.executor import Executor
@@ -14,23 +16,23 @@ from .logic import next_available_executor, runnable_tasks
 from . import util
 from functools import partial
 
-env = simpy.Environment()
-
 
 class Scheduler(object):
     def __init__(self, env: simpy.Environment, DAG: list[Stage]):
         self.env = env
         self.DAG = DAG
         self.executors: dict[int, Executor] = dict()
+        # tuple of dep (stage id) and partition (task index)
+        self.shuffles: dict[(int, int), Executor] = dict()  # type: ignore
         self.scheduled: dict[int, LaunchTask] = dict()
         self.scheduler_queue = simpy.Store(env)
-        self.nextid = util.nextidgen()
+        self.nextid: Generator[int, None, None] = util.nextidgen()
         self.logger = partial(util.log, env, "scheduler")
 
-    def start(self):
+    def start(self: "Scheduler") -> simpy.Process:
         return self.env.process(self.loop())
 
-    def loop(self):
+    def loop(self: "Scheduler") -> Generator[typing.Any, None, None]:
         while True:
             self.schedule_runnable_tasks()
             event = yield self.scheduler_queue.get()
@@ -51,7 +53,7 @@ class Scheduler(object):
                 case _:
                     self.logger(f"unhandled: {event!r}")
 
-    def schedule_runnable_tasks(self):
+    def schedule_runnable_tasks(self: "Scheduler") -> None:
         while (executor := next_available_executor(self.executors)) and (
             taskset := runnable_tasks(self.DAG)
         ) != []:
@@ -68,10 +70,10 @@ class Scheduler(object):
             util.put(executor.queue, launch_task)
             executor.reserve()
 
-    def register_executor(self, executor: Executor):
+    def register_executor(self: "Scheduler", executor: Executor) -> None:
         self.executors[executor.id] = executor
 
-    def executor_killed(self, executor_killed: ExecutorKilled):
+    def executor_killed(self: "Scheduler", executor_killed: ExecutorKilled) -> None:
         executor = self.executors[executor_killed.eid]
         for tid in executor.taskprocs.keys():
             if launched_task := self.scheduled.pop(tid, None):
@@ -80,7 +82,7 @@ class Scheduler(object):
                 launched_task.status = "killed"
         del self.executors[executor.id]
 
-    def fetch_failed(self, fetch_failed: FetchFailed):
+    def fetch_failed(self: "Scheduler", fetch_failed: FetchFailed) -> None:
         launch_task = self.scheduled.pop(fetch_failed.tid, None)
         if launch_task:
             task = launch_task.task
@@ -91,7 +93,7 @@ class Scheduler(object):
             parent_stage = self.DAG[fetch_failed.dep]
             parent_stage.status = "failed"
             for task in parent_stage.tasks:
-                if task.launched_tasks[task.current].eid not in self.executors:
+                if task.launched_tasks[task.current].eid not in self.executors:  # type: ignore
                     task.status, task.current = "pending", None
             executor = self.executors.get(launch_task.eid, None)
             if executor:
@@ -99,7 +101,7 @@ class Scheduler(object):
         else:
             self.logger(f"{Fore.MAGENTA}stale {fetch_failed!r}")
 
-    def status_update(self, status_update: StatusUpdate):
+    def status_update(self: "Scheduler", status_update: StatusUpdate) -> None:
         launched_task = self.scheduled.pop(status_update.tid, None)
         if launched_task and launched_task.task.current == status_update.tid:
             task = launched_task.task
@@ -122,12 +124,13 @@ class Scheduler(object):
             self.logger(f"{Fore.MAGENTA}stale {status_update!r}")
 
 
-def main(DAG: list[Stage] = [], E=1, cores=1):
-    print("fauxspark!")
+def main(DAG: list[Stage] = [], E: int = 1, cores: int = 1) -> None:
+    env = simpy.Environment()
+    util.log(env, "main", "fauxspark!")
     scheduler = Scheduler(env, DAG)
-    print(f"starting {E} executors...")
+    util.log(env, "main", f"starting {E} executors...")
 
-    def mk_executor(i):
+    def mk_executor(i: int) -> Executor:
         executor = Executor(
             env=env,
             DAG=DAG,
@@ -140,23 +143,23 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
         )
         return executor
 
-    def start_executors():
+    def start_executors() -> None:
         for i in range(E):
             executor = mk_executor(i)
             executor.start()
             scheduler.scheduler_queue.put(executor)
 
-    print("starting executors...")
+    util.log(env, "main", "starting executors...")
     start_executors()
 
-    print("starting scheduler")
+    util.log(env, "main", "starting scheduler")
     scheduler.start()
 
-    def simulate_a_failure():
+    def simulate_a_failure() -> Generator[typing.Any, None, None]:
         # just before the last task is about to finish
         yield env.timeout(24)
         executor = scheduler.executors.get(0)
-        executor.kill()
+        executor.kill()  # type: ignore
         scheduler.scheduler_queue.put(ExecutorKilled(eid=0))
         executor = mk_executor(1)
         executor.start()
@@ -166,12 +169,12 @@ def main(DAG: list[Stage] = [], E=1, cores=1):
 
     env.run()
     if all(stage.status == "completed" for stage in scheduler.DAG):
-        print(f"{Fore.GREEN}{env.now:6.2f}: job completed successfully")
+        util.log(env, "main", f"{Fore.GREEN}job completed successfully")
     else:
-        print(f"{Fore.RED}{env.now:6.2f}: job did not complete{Style.RESET_ALL}\n${DAG}")
+        util.log(env, "main", f"{Fore.RED}job did not complete{Style.RESET_ALL}\n${DAG}")
 
 
-def cli():
+def cli() -> None:
     init(autoreset=True)
     os.environ["PYTHONUNBUFFERED"] = "1"
     main(

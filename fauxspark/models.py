@@ -11,7 +11,7 @@ class Stage(BaseModel):
     stats: Mapping[Any, Any]
     tasks: List["Task"]
 
-    def __repr__(self):
+    def __repr__(self: "Stage") -> str:
         return f"{Fore.CYAN}Stage{Style.RESET_ALL}(id={self.id}, status={self.status})"
 
 
@@ -20,9 +20,9 @@ class Task(BaseModel):
     status: str
     stage_id: int
     current: Optional[int] = None
-    launched_tasks: Mapping[int, "LaunchTask"] = Field(default_factory=dict)
+    launched_tasks: dict[int, "LaunchTask"] = Field(default_factory=dict)
 
-    def __repr__(self):
+    def __repr__(self: "Task") -> str:
         return f"{Fore.GREEN}Task{Style.RESET_ALL}(stage={self.stage_id}, index={self.index}, status={self.status})"
 
 
@@ -33,10 +33,10 @@ class LaunchTask(BaseModel):
     status: str
 
     @property
-    def stage_id(self):
+    def stage_id(self: "LaunchTask") -> int:
         return self.task.stage_id
 
-    def __repr__(self):
+    def __repr__(self: "LaunchTask") -> str:
         return f"{Fore.YELLOW}LaunchTask{Style.RESET_ALL}(id={self.tid}, executor_id={self.eid}, status={self.status}, task={self.task!r})"
 
 
@@ -49,7 +49,7 @@ class StatusUpdate(BaseModel):
     status: str
     eid: int
 
-    def __repr__(self):
+    def __repr__(self: "StatusUpdate") -> str:
         return f"{Fore.BLUE}StatusUpdate{Style.RESET_ALL}(id={self.tid}, status={self.status}, executor_id={self.eid})"
 
 
@@ -58,12 +58,12 @@ class FetchFailed(BaseModel):
     dep: int
     eid: int
 
-    def __repr__(self):
+    def __repr__(self: "FetchFailed") -> str:
         return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.tid}, dep={self.dep}, executor_id={self.eid})"
 
 
 class ExecutorKilled(BaseModel):
     eid: int
 
-    def __repr__(self):
+    def __repr__(self: "ExecutorKilled") -> str:
         return f"{Fore.RED}ExecutorKilled{Style.RESET_ALL}(id={self.eid})"
