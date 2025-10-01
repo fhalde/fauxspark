@@ -6,13 +6,22 @@ A discrete event simulation of Apache Spark, built with SimPy.
 > The implementation reflects my understanding of Apache Spark internals.
 > Contributions, feedback, and discussions are welcome!
 
-# Purpose
+## Purpose
 
 If you're running Apache Spark at large scale, experimentation can be costly and sometimes impractical. While data analysis can offer insights, I found simulations more intuitive/approachable. Surprisingly, they work just fine!
 
 This simulator intends to fills that gap by allowing you to experiment and observe runtime characteristics such as performance & reliability under different job schedules, cluster configurations, and failure rate distributions.
 
 Like any simulator, the numbers produced here are approximate & may differ from real-world behavior, and are only as accurate as the model. **The plan of course is to make the model better** 😀
+
+## Getting Started
+
+```bash
+git clone https://github.com/fhalde/fauxspark;
+cd fauxspark;
+uv sync;
+uv run sim --executors 1 --cores 1 -f examples/dag.json;
+```
 
 ## ✅ Current Features
 

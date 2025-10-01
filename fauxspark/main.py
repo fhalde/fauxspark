@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from typing import Generator
@@ -15,6 +16,7 @@ from .models import (
 from .logic import next_available_executor, runnable_tasks
 from . import util
 from functools import partial
+import sys
 
 
 class Scheduler(object):
@@ -177,13 +179,38 @@ def main(DAG: list[Stage] = [], E: int = 1, cores: int = 1) -> None:
 def cli() -> None:
     init(autoreset=True)
     os.environ["PYTHONUNBUFFERED"] = "1"
+
+    parser = argparse.ArgumentParser(description="FauxSpark - A Spark simulation framework")
+    parser.add_argument(
+        "-e", "--executors", type=int, default=1, help="Number of executors (default: 1)"
+    )
+    parser.add_argument(
+        "-c", "--cores", type=int, default=1, help="Number of cores per executor (default: 1)"
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        type=str,
+        required=True,
+        help="Path to DAG JSON file",
+    )
+
+    args = parser.parse_args()
+
+    try:
+        with open(args.file, "r") as f:
+            dag = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: DAG file '{args.file}' not found")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in DAG file '{args.file}': {e}")
+        sys.exit(1)
+
     main(
-        DAG=[
-            Stage.model_validate(stage)
-            for stage in json.load(open(os.path.join(os.path.dirname(__file__), "dag.json")))
-        ],
-        E=1,
-        cores=1,
+        DAG=[Stage.model_validate(stage) for stage in dag],
+        E=args.executors,
+        cores=args.cores,
     )
 
 
