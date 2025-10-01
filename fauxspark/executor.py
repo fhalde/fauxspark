@@ -4,6 +4,10 @@ from .models import Stage, LaunchTask, StatusUpdate, FetchFailed, KillTask
 from . import util
 from functools import partial
 from colorama import Fore, Style
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .main import Scheduler
 
 
 class Executor(object):
@@ -16,6 +20,7 @@ class Executor(object):
         cores: int,
         queue: simpy.Store,
         scheduler_queue: simpy.Store,
+        scheduler: "Scheduler",
     ):
         self.env = env
         self.DAG = DAG
@@ -26,6 +31,7 @@ class Executor(object):
         self.logger = partial(util.log, env, f"executor-{self.id}")
         self.queue = queue
         self.scheduler_queue = scheduler_queue
+        self.scheduler = scheduler
         self.taskprocs: dict[int, simpy.Process] = dict()
         self.fetchprocs: dict[int, simpy.Process] = dict()
 
