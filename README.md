@@ -8,7 +8,7 @@ A discrete event simulation of Apache Spark, built with SimPy.
 
 ## Purpose
 
-If you're running Apache Spark at large scale, experimentation can be costly and sometimes impractical. While data analysis can offer insights, I found simulations more intuitive/approachable. Surprisingly, they work just fine!
+If you're running Apache Spark at large scale, experimentation can be costly and sometimes impractical. While data analysis can offer insights, I found simulations to be more approachable in understanding system behavior. Surprisingly, they work just fine!
 
 This simulator intends to fills that gap by allowing you to experiment and observe runtime characteristics such as performance & reliability under different job schedules, cluster configurations, and failure rate distributions.
 
