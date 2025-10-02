@@ -114,7 +114,6 @@ def cli() -> None:
     )
 
     def parse_sim_failure(text: str) -> tuple[int, float]:
-        print(text)
         try:
             e, t = text.split(",")
             return (int(e), float(t))
