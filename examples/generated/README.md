@@ -1,1 +1,1 @@
-The sample tests & readme's in this folder was auto-generated using AI
+####  All sample tests and READMEs in this folder were AI-generated.
