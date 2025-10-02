@@ -86,7 +86,9 @@ def cli() -> None:
     init(autoreset=True)
     os.environ["PYTHONUNBUFFERED"] = "1"
 
-    parser = argparse.ArgumentParser(description="FauxSpark - A Spark simulation framework")
+    parser = argparse.ArgumentParser(
+        description="FauxSpark - A discrete event simulation modeling Apache Spark using SimPy"
+    )
     parser.add_argument(
         "-e", "--executors", type=int, default=1, help="Number of executors (default: 1)"
     )
