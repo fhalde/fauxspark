@@ -8,10 +8,10 @@ The following Mermaid graph shows the dependency structure between stages:
 
 ```mermaid
 graph TD
-    Stage0["Stage 0<br/>Partitions: 4<br/>Task Avg: 24.3s"] --> Stage1["Stage 1<br/>Partitions: 7<br/>Task Avg: 29.9s<br/>Shuffle Avg: 11.9s"]
-    Stage1 --> Stage2["Stage 2<br/>Partitions: 4<br/>Task Avg: 18.1s<br/>Shuffle Avg: 10.1s"]
-    Stage2 --> Stage3["Stage 3<br/>Partitions: 2<br/>Task Avg: 20.9s<br/>Shuffle Avg: 5.3s"]
-    Stage1 --> Stage4["Stage 4<br/>Partitions: 1<br/>Task Avg: 16.6s<br/>Shuffle Avg: 34.1s"]
+    Stage0["Stage 0<br/>Partitions: 4<br/>Task Avg: 24s"] --> Stage1["Stage 1<br/>Partitions: 7<br/>Task Avg: 29s<br/>Shuffle Avg: 11s"]
+    Stage1 --> Stage2["Stage 2<br/>Partitions: 4<br/>Task Avg: 18s<br/>Shuffle Avg: 10s"]
+    Stage2 --> Stage3["Stage 3<br/>Partitions: 2<br/>Task Avg: 20s<br/>Shuffle Avg: 5s"]
+    Stage1 --> Stage4["Stage 4<br/>Partitions: 1<br/>Task Avg: 16s<br/>Shuffle Avg: 34s"]
     Stage2 --> Stage4
     Stage3 --> Stage4
 
