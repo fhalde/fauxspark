@@ -9,15 +9,15 @@ from .models import ExecutorKilled
 from . import util
 from typing import Generator, Any
 import sys
-
+from pydantic import TypeAdapter
 from .models import Stage
 
 
-def main(DAG: list[Stage] = [], E: int = 1, cores: int = 1) -> None:
+def main(DAG: list[Stage], args: argparse.Namespace) -> None:
     env = simpy.Environment()
     util.log(env, "main", "fauxspark!")
     scheduler = Scheduler(env, DAG)
-    util.log(env, "main", f"starting {E} executors...")
+    util.log(env, "main", f"starting {args.executors} executors...")
 
     def mk_executor(i: int) -> Executor:
         executor = Executor(
@@ -25,7 +25,7 @@ def main(DAG: list[Stage] = [], E: int = 1, cores: int = 1) -> None:
             DAG=DAG,
             executors=scheduler.executors,
             id=i,
-            cores=cores,
+            cores=args.cores,
             queue=simpy.Store(env),
             scheduler_queue=scheduler.scheduler_queue,
             scheduler=scheduler,
@@ -33,7 +33,7 @@ def main(DAG: list[Stage] = [], E: int = 1, cores: int = 1) -> None:
         return executor
 
     def start_executors() -> None:
-        for i in range(E):
+        for i in range(args.executors):
             executor = mk_executor(i)
             executor.start()
             scheduler.scheduler_queue.put(executor)
@@ -44,23 +44,42 @@ def main(DAG: list[Stage] = [], E: int = 1, cores: int = 1) -> None:
     util.log(env, "main", "starting scheduler")
     scheduler.start()
 
-    def simulate_a_failure() -> Generator[Any, None, None]:
-        # just before the last task is about to finish
-        yield env.timeout(24)
-        executor = scheduler.executors.get(0)
-        executor.kill()  # type: ignore
-        scheduler.scheduler_queue.put(ExecutorKilled(eid=0))
-        executor = mk_executor(1)
+    last_eid = args.executors
+
+    def simulate_failure(eid: int, t: float) -> Generator[Any, None, None]:
+        yield env.timeout(t)
+        executor = scheduler.executors.get(eid, None)
+        if executor is None:
+            return
+        executor.kill()
+        scheduler.scheduler_queue.put(ExecutorKilled(eid=eid))
+        if args.autoscale:
+            yield env.timeout(args.autoscale_delay)
+            nonlocal last_eid
+            executor = mk_executor(last_eid)
+            last_eid += 1
+            executor.start()
+            scheduler.scheduler_queue.put(executor)
+
+    def simulate_autoscale(t: float) -> Generator[Any, None, None]:
+        yield env.timeout(t)
+        nonlocal last_eid
+        executor = mk_executor(last_eid)
+        last_eid += 1
         executor.start()
         scheduler.scheduler_queue.put(executor)
 
-    env.process(simulate_a_failure())
+    for eid, t in args.sf:
+        env.process(simulate_failure(eid, t))
+
+    for t in args.sa:
+        env.process(simulate_autoscale(t))
 
     env.run()
     if all(stage.status == "completed" for stage in scheduler.DAG):
         util.log(env, "main", f"{Fore.GREEN}job completed successfully")
     else:
-        util.log(env, "main", f"{Fore.RED}job did not complete{Style.RESET_ALL}\n${DAG}")
+        util.log(env, "main", f"{Fore.RED}job did not complete{Style.RESET_ALL}\n{DAG}")
 
 
 def cli() -> None:
@@ -82,11 +101,57 @@ def cli() -> None:
         help="Path to DAG JSON file",
     )
 
+    def parse_sim_failure(text: str) -> tuple[int, float]:
+        print(text)
+        try:
+            e, t = text.split(",")
+            return (int(e), float(t))
+        except ValueError:
+            raise argparse.ArgumentTypeError("Each pair must look like (executor id, time)")
+
+    def parse_sim_autoscale(text: str) -> float:
+        try:
+            return float(text)
+        except ValueError:
+            raise argparse.ArgumentTypeError("Each time must be a number")
+
+    parser.add_argument(
+        "--sf",
+        nargs="+",
+        default=[],
+        type=parse_sim_failure,
+        help="pairs of (executor id,time) at which to simulate a failure",
+    )
+
+    parser.add_argument(
+        "--sa",
+        nargs="+",
+        default=[],
+        type=parse_sim_autoscale,
+        help="list of t at which to simulate autoscaling",
+    )
+
+    parser.add_argument(
+        "-a",
+        "--autoscale",
+        default=False,
+        type=bool,
+        help="enable autoscaling",
+    )
+
+    parser.add_argument(
+        "-d",
+        "--autoscale-delay",
+        default=1,
+        type=int,
+        help="delay in seconds before autoscaling",
+    )
+
     args = parser.parse_args()
 
     try:
         with open(args.file, "r") as f:
-            dag = json.load(f)
+            dag = TypeAdapter(list[Stage]).validate_python(json.load(f))
     except FileNotFoundError:
         print(f"Error: DAG file '{args.file}' not found")
         sys.exit(1)
@@ -94,11 +159,7 @@ def cli() -> None:
         print(f"Error: Invalid JSON in DAG file '{args.file}': {e}")
         sys.exit(1)
 
-    main(
-        DAG=[Stage.model_validate(stage) for stage in dag],
-        E=args.executors,
-        cores=args.cores,
-    )
+    main(DAG=dag, args=args)
 
 
 if __name__ == "__main__":

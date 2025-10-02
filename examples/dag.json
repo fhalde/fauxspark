@@ -28,7 +28,7 @@
         "status": "pending",
         "stats": {
             "shuffle": {
-                "avg": 4.0
+                "avg": 0.0
             },
             "avg": 5.0
         },
