@@ -90,10 +90,18 @@ def cli() -> None:
         description="FauxSpark - A discrete event simulation modeling Apache Spark using SimPy"
     )
     parser.add_argument(
-        "-e", "--executors", type=int, default=1, help="Number of executors (default: 1)"
+        "-e",
+        "--executors",
+        type=int,
+        default=1,
+        help="Set the number of executors to use (default: 1).",
     )
     parser.add_argument(
-        "-c", "--cores", type=int, default=1, help="Number of cores per executor (default: 1)"
+        "-c",
+        "--cores",
+        type=int,
+        default=1,
+        help="Specify how many cores each executor will have (default: 1).",
     )
     parser.add_argument(
         "-f",
@@ -122,7 +130,7 @@ def cli() -> None:
         nargs="+",
         default=[],
         type=parse_sim_failure,
-        help="pairs of (executor id,time) at which to simulate a failure",
+        help="Specify list of failure events as pairs of (executor_id,time) to simulate failures.",
     )
 
     parser.add_argument(
@@ -130,7 +138,7 @@ def cli() -> None:
         nargs="+",
         default=[],
         type=parse_sim_autoscale,
-        help="list of t at which to simulate autoscaling",
+        help="Specify times (t) at which autoscaling should be triggered.",
     )
 
     parser.add_argument(
@@ -138,7 +146,7 @@ def cli() -> None:
         "--autoscale",
         default=False,
         type=bool,
-        help="enable autoscaling",
+        help="Turn autoscaling on or off.",
     )
 
     parser.add_argument(
@@ -146,7 +154,7 @@ def cli() -> None:
         "--autoscale-delay",
         default=1,
         type=int,
-        help="delay in seconds before autoscaling",
+        help="Set the delay (in seconds) before autoscaling takes effect.",
     )
 
     args = parser.parse_args()
