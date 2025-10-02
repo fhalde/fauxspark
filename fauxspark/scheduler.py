@@ -87,6 +87,8 @@ class Scheduler(object):
             current_stage = self.DAG[task.stage_id]
             current_stage.status = "pending"
             for task in current_stage.tasks:
+                if task.current:
+                    self.scheduled.pop(task.current, None)
                 task.status, task.current = "pending", None
             parent_stage = self.DAG[fetch_failed.dep]
             parent_stage.status = "failed"

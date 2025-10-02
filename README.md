@@ -21,6 +21,7 @@ git clone https://github.com/fhalde/fauxspark
 cd fauxspark
 uv sync
 uv run sim -f examples/simple/dag.json
+uv run sim -f examples/shuffle/dag.json -a true -d 2 --sf 0,7 1,13 -e 2 -c 2
 ```
 
 ## Help

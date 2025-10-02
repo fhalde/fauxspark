@@ -80,6 +80,8 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
         util.log(env, "main", f"{Fore.GREEN}job completed successfully")
     else:
         util.log(env, "main", f"{Fore.RED}job did not complete{Style.RESET_ALL}\n{DAG}")
+        for stage in scheduler.DAG:
+            util.log(env, "main", f"{stage.tasks!r}")
 
 
 def cli() -> None:
