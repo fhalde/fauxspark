@@ -23,9 +23,9 @@ uv sync
 uv run sim -f examples/simple/dag.json
 
 uv run sim -f examples/shuffle/dag.json -a true -d 2 --sf 0,7 1,13 -e 2 -c 2
-# 1. auto-replace (-a) executor with a delay (-d) of 2 seconds.
-# 2. simulate a executor failure (--sf) for executor 0 at t=7 and executor 1 at t=13.
-# 3. initial cluster is comprised of 2 executors (-e) and 2 cores (-c).
+# 1. auto-replace (-a) executor on failure with a delay (-d) of 2 seconds
+# 2. simulate a failure (--sf) for executor 0 at t=7 and executor 1 at t=13
+# 3. bootstrap the cluster with 2 executors (-e) and 2 cores (-c)
 ```
 
 ## Help
