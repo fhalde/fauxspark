@@ -17,10 +17,27 @@ Like any simulator, the numbers produced here are approximate & may differ from 
 ## Getting Started
 
 ```bash
-git clone https://github.com/fhalde/fauxspark;
-cd fauxspark;
-uv sync;
-uv run sim -f examples/dag.json;
+git clone https://github.com/fhalde/fauxspark
+cd fauxspark
+uv sync
+uv run sim -f examples/simple/dag.json
+```
+
+## Help
+```bash
+options:
+  -h, --help            show this help message and exit
+  -e EXECUTORS, --executors EXECUTORS
+                        Set the number of executors to use (default: 1).
+  -c CORES, --cores CORES
+                        Specify how many cores each executor will have (default: 1).
+  -f FILE, --file FILE  Path to DAG JSON file
+  --sf SF [SF ...]      Specify list of failure events as pairs of (executor_id,time) to simulate executor failures.
+  --sa SA [SA ...]      Specify times (t) at which autoscaling (adding a new executor) should take place.
+  -a AUTO_REPLACE, --auto-replace AUTO_REPLACE
+                        Turn on/off auto-replacement of executors on failure.
+  -d AUTO_REPLACE_DELAY, --auto-replace-delay AUTO_REPLACE_DELAY
+                        Set the delay (in seconds) it takes to replace an executor on failure.
 ```
 
 ## ✅ Current Features

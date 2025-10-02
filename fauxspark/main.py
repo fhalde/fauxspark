@@ -53,15 +53,15 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
             return
         executor.kill()
         scheduler.scheduler_queue.put(ExecutorKilled(eid=eid))
-        if args.autoscale:
-            yield env.timeout(args.autoscale_delay)
+        if args.auto_replace:
+            yield env.timeout(args.auto_replace_delay)
             nonlocal last_eid
             executor = mk_executor(last_eid)
             last_eid += 1
             executor.start()
             scheduler.scheduler_queue.put(executor)
 
-    def simulate_autoscale(t: float) -> Generator[Any, None, None]:
+    def simulate_auto_replace(t: float) -> Generator[Any, None, None]:
         yield env.timeout(t)
         nonlocal last_eid
         executor = mk_executor(last_eid)
@@ -73,7 +73,7 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
         env.process(simulate_failure(eid, t))
 
     for t in args.sa:
-        env.process(simulate_autoscale(t))
+        env.process(simulate_auto_replace(t))
 
     env.run()
     if all(stage.status == "completed" for stage in scheduler.DAG):
@@ -130,7 +130,7 @@ def cli() -> None:
         nargs="+",
         default=[],
         type=parse_sim_failure,
-        help="Specify list of failure events as pairs of (executor_id,time) to simulate failures.",
+        help="Specify list of failure events as pairs of (executor_id,time) to simulate executor failures.",
     )
 
     parser.add_argument(
@@ -138,23 +138,23 @@ def cli() -> None:
         nargs="+",
         default=[],
         type=parse_sim_autoscale,
-        help="Specify times (t) at which autoscaling should be triggered.",
+        help="Specify times (t) at which autoscaling (adding a new executor) should take place.",
     )
 
     parser.add_argument(
         "-a",
-        "--autoscale",
+        "--auto-replace",
         default=False,
         type=bool,
-        help="Turn autoscaling on or off.",
+        help="Turn on/off auto-replacement of executors on failure.",
     )
 
     parser.add_argument(
         "-d",
-        "--autoscale-delay",
+        "--auto-replace-delay",
         default=1,
         type=int,
-        help="Set the delay (in seconds) before autoscaling takes effect.",
+        help="Set the delay (in seconds) it takes to replace an executor on failure (default: 1).",
     )
 
     args = parser.parse_args()
