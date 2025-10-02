@@ -1,0 +1,25 @@
+[
+    {
+        "id": 0,
+        "deps": [],
+        "status": "pending",
+        "stats": {
+            "avg": 5.0
+        },
+        "partitions": 2,
+        "tasks": []
+    },
+    {
+        "id": 1,
+        "deps": [0],
+        "status": "pending",
+        "stats": {
+            "shuffle": {
+                "avg": 0.0
+            },
+            "avg": 5.0
+        },
+        "partitions": 4,
+        "tasks": []
+    }
+]

@@ -12,7 +12,7 @@ class Stage(BaseModel):
     tasks: List["Task"]
 
     def __repr__(self: "Stage") -> str:
-        return f"{Fore.CYAN}Stage{Style.RESET_ALL}(id={self.id}, status={self.status})"
+        return f"{Fore.CYAN}Stage{Style.RESET_ALL}(id={self.id}, status={self.status}, deps={self.deps})"
 
 
 class Task(BaseModel):
