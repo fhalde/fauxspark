@@ -19,8 +19,3 @@ graph TD
     class Stage0,Stage1,Stage2,Stage3,Stage4 stageBox
 ```
 
-This generated DAG demonstrates:
-- Linear progression through stages 0→1→2→3
-- Multiple dependency convergence at Stage 3
-- Final stage (4) collecting results from multiple paths
-- Varying shuffle performance characteristics across stages

@@ -19,8 +19,3 @@ graph TD
     class Stage0,Stage1,Stage2,Stage3,Stage4 stageBox
 ```
 
-This generated DAG demonstrates:
-- Two independent root stages (0 and 2)
-- Convergence at Stage 3 from multiple sources
-- Final aggregation at Stage 4 from three different paths
-- High partition count in Stage 2 (10 partitions)

@@ -21,8 +21,3 @@ graph TD
     class Stage0,Stage1,Stage2,Stage3,Stage4 stageBox
 ```
 
-This generated DAG demonstrates:
-- Two independent root stages (0 and 1)
-- Complex convergence patterns with Stage 3 depending on all previous stages
-- Multiple paths to the final Stage 4
-- Significant task execution time variation (11.0s to 26.9s)

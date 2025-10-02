@@ -18,9 +18,3 @@ graph TD
     class Stage0,Stage1,Stage2,Stage3,Stage4 stageBox
 ```
 
-This generated DAG demonstrates:
-- Two independent root stages (0 and 2)
-- Simple linear progression: Stage 0 → Stage 1 → Stage 3
-- Independent path from Stage 2 directly to final stage
-- Convergence at Stage 4 from multiple sources
-- Highest individual task execution time in Stage 2 (24.6s)

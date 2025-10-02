@@ -22,8 +22,3 @@ graph TD
     class Stage0,Stage1,Stage2,Stage3,Stage4 stageBox
 ```
 
-This generated DAG demonstrates:
-- Single root stage (0) feeding into multiple branches
-- High fan-out from Stage 0 to all other stages
-- Complex convergence at final Stage 4 from all intermediate stages
-- Highest partition count in Stage 1 (9 partitions)
