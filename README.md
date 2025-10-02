@@ -10,7 +10,7 @@ A discrete event simulation of Apache Spark, built with SimPy.
 
 If you're running Apache Spark at large scale, experimentation can be costly and sometimes impractical. While data analysis can offer insights, I found simulations to be more approachable in understanding system behavior. Surprisingly, they work just fine!
 
-This simulator intends to fills that gap by allowing you to experiment and observe runtime characteristics such as performance & reliability under different job schedules, cluster configurations, and failure rate distributions.
+This simulator intends to fill that gap by allowing users to experiment and observe Apache Spark's runtime characteristics such as performance and reliability for different job schedules, cluster configurations, and failure rate distributions.
 
 Like any simulator, the numbers produced here are approximate & may differ from real-world behavior, and are only as accurate as the model. **The plan of course is to make the model better** 😀
 
