@@ -20,27 +20,27 @@ Like any simulator, the numbers produced here are approximate & may differ from 
 git clone https://github.com/fhalde/fauxspark;
 cd fauxspark;
 uv sync;
-uv run sim --executors 1 --cores 1 -f examples/dag.json;
+uv run sim -f examples/dag.json;
 ```
 
 ## ✅ Current Features
 
-FauxSpark currently simulates a simplified version of Apache Spark, including:
+FauxSpark currently implements a simplified model of Apache Spark, featuring:
 
-- DAG execution: stages, tasks, and dependencies
-- Executor failure handling with automatic retries
-- Shuffle fetch failures and stage resubmission
-- Basic shuffle read
-- Supports single-job execution
+- A DAG execution engine with Stages and Tasks
+- Automatic retries when Executors fail
+- Handling of shuffle-fetch failures with stage resubmission
+- Naive shuffle reads
+- Only supports running a single job
 
 ## 🚀 Future Ideas
 
 Planned enhancements:
 
-- Speculative task execution
-- Spark's Caching mechanism
-- Support for multiple concurrent jobs with fair resource sharing
-- Modeling Cluster topology (e.g., for inter-AZ traffic and cost)
+- Speculative Task Execution
+- Caching in Spark
+- Support for multiple concurrent jobs & fair resource sharing
+- Modeling different cluster topologies (e.g., for inter-AZ traffic and cost)
 - Enhanced reporting
 - Accepting RDD graphs / SparkPlans as input
 
