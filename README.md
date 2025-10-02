@@ -25,7 +25,7 @@ uv run sim -f examples/dag.json;
 
 ## ✅ Current Features
 
-FauxSpark currently implements a simplified model of Apache Spark, featuring:
+FauxSpark currently implements a simplified model of Apache Spark, which includes:
 
 - A DAG execution engine with Stages and Tasks
 - Automatic retries when Executors fail
