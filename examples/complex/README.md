@@ -20,10 +20,3 @@ graph TD
     classDef stageBox fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     class Stage0,Stage1,Stage2,Stage3,Stage4 stageBox
 ```
-
-This example demonstrates:
-- Multiple dependency paths
-- Fan-out from Stage 0 to multiple stages
-- Fan-in to Stage 4 from multiple stages
-- Varying partition counts and execution times
-- Shuffle operations with different performance characteristics
