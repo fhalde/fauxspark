@@ -5,7 +5,7 @@ import simpy
 from colorama import init, Fore, Style
 from .scheduler import Scheduler
 from .executor import Executor
-from .models import ExecutorKilled
+from .models import ExecutorKilled, Task
 from . import util
 from typing import Generator, Any
 import sys
@@ -152,6 +152,11 @@ def cli() -> None:
     try:
         with open(args.file, "r") as f:
             dag = TypeAdapter(list[Stage]).validate_python(json.load(f))
+            for stage in dag:
+                stage.tasks = [
+                    Task(index=i, status="pending", stage_id=stage.id)
+                    for i in range(stage.partitions)
+                ]
     except FileNotFoundError:
         print(f"Error: DAG file '{args.file}' not found")
         sys.exit(1)
