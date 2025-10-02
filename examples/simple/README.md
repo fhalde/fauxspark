@@ -1,6 +1,6 @@
 # Simple
 
-This example demonstrates a basic single-stage DAG with no dependencies.
+Single stage DAG (no dependencies).
 
 ## DAG Structure
 

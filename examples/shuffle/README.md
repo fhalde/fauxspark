@@ -1,6 +1,6 @@
 # Shuffle
 
-This example demonstrates a shuffle operation with stage dependencies.
+Shuffle operation with stage dependencies.
 
 ## DAG Structure
 
