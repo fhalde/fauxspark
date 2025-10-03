@@ -87,7 +87,7 @@ class Executor(object):
                             if e.cause == "disconnect":
                                 self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
                                 return
-                            return
+                            raise e
                     else:
                         self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
                         return
