@@ -49,11 +49,10 @@ options:
 
 FauxSpark currently implements a simplified model of Apache Spark, which includes:
 
-- A DAG execution engine with Stages and Tasks
-- Automatic retries when Executors fail
-- Handling of shuffle-fetch failures with stage resubmission
-- Naive shuffle reads
-- Only supports running a single job
+- DAG scheduling with stages, tasks, and dependencies
+- Automatic retries on executor or shuffle-fetch failures
+- Single-job execution with configurable cluster parameters
+- Simple CLI to tweak cluster size, simulate failures, and scaling up executors
 
 ## 🚀 Future Ideas
 
