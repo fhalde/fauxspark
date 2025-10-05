@@ -28,7 +28,7 @@ class Executor(object):
         self.id = id
         self.executors = executors
         self.cores = cores
-        self.available_slots = cores
+        self.cores_free = cores
         self.logger = partial(util.log, env, f"executor-{self.id}")
         self.queue = queue
         self.scheduler_queue = scheduler_queue
@@ -69,9 +69,9 @@ class Executor(object):
 
     def taskproc(self, launch_task: LaunchTask) -> Generator[typing.Any, None, None]:
         tid = launch_task.tid
-        stage_id = launch_task.stage_id
+        stage = launch_task.task.stage
         try:
-            deps = self.DAG[stage_id].deps
+            deps = stage.deps
             for dep in deps:
                 if self.DAG[dep].status != "completed":
                     self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
@@ -82,7 +82,7 @@ class Executor(object):
                         if current.eid == self.id:  # local fetch
                             continue
                         try:
-                            yield executor.fetch(tid, stage_id)
+                            yield executor.fetch(tid, stage.id)
                         except simpy.Interrupt as e:
                             if e.cause == "disconnect":
                                 self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
@@ -91,24 +91,24 @@ class Executor(object):
                     else:
                         self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
                         return
-            yield self.env.timeout(self.DAG[stage_id].stats["avg"])
+            yield self.env.timeout(stage.stats["avg"])
             self.queue.put(StatusUpdate(tid=tid, status="completed", eid=self.id))
         except simpy.Interrupt as e:
             if e.cause == "killed":
                 self.queue.put(StatusUpdate(tid=tid, status="killed", eid=self.id))
                 return
 
-    def fetch(self: "Executor", tid: int, stage_id: int) -> simpy.Process:
-        self.fetchprocs[tid] = self.env.process(self.fetchproc(stage_id))
+    def fetch(self: "Executor", tid: int, stage: Stage) -> simpy.Process:
+        self.fetchprocs[tid] = self.env.process(self.fetchproc(stage))
         return self.fetchprocs[tid]
 
-    def fetchproc(self: "Executor", stage_id: int) -> Generator[typing.Any, None, None]:
+    def fetchproc(self: "Executor", stage: Stage) -> Generator[typing.Any, None, None]:
         # this will be the avg bytes read per partition from this shuffle dependency
-        # bytes = self.DAG[stage_id].stats["shuffle"]["bytes"]
+        # bytes = stage.stats["shuffle"]["bytes"]
         # chunks = bytes // 48 * 1024 * 1024
         # rtt = 0.05  # rtt within an aws az
         # yield self.env.timeout(int(chunks * rtt))
-        yield self.env.timeout(self.DAG[stage_id].stats["shuffle"]["avg"])
+        yield self.env.timeout(stage.stats["shuffle"]["avg"])
 
     def kill(self: "Executor") -> None:
         for process in list(self.taskprocs.values()):
@@ -119,10 +119,10 @@ class Executor(object):
                 process.interrupt("disconnect")
 
     def reserve(self: "Executor") -> None:
-        self.available_slots -= 1
+        self.cores_free -= 1
 
     def release(self: "Executor") -> None:
-        self.available_slots += 1
+        self.cores_free += 1
 
     def __repr__(self: "Executor") -> str:
-        return f"{Fore.GREEN}Executor{Style.RESET_ALL}(id={self.id}, cores={self.cores}, available_slots={self.available_slots})"
+        return f"{Fore.GREEN}Executor{Style.RESET_ALL}(id={self.id}, cores={self.cores}, available_slots={self.cores_free})"

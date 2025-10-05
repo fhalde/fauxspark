@@ -5,8 +5,10 @@ build/
 dist/
 wheels/
 *.egg-info
+.vscode/
 
 # Virtual environments
 .venv
 
 fauxspark/ideating.py
+fauxspark/net.py

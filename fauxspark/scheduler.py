@@ -84,7 +84,7 @@ class Scheduler(object):
         launch_task = self.scheduled.pop(fetch_failed.tid, None)
         if launch_task:
             task = launch_task.task
-            current_stage = self.DAG[task.stage_id]
+            current_stage = task.stage
             current_stage.status = "pending"
             for task in current_stage.tasks:
                 if task.current:
@@ -109,14 +109,14 @@ class Scheduler(object):
                 case "completed":
                     task.status, task.current = "completed", status_update.tid
                     launched_task.status = "completed"
-                    stage = self.DAG[task.stage_id]
+                    stage = task.stage
                     if all(task.status == "completed" for task in stage.tasks):
                         stage.status = "completed"
                     executor = self.executors.get(launched_task.eid, None)
                 case "killed":
                     task.status, task.current = "killed", None
                     launched_task.status = "killed"
-                    stage = self.DAG[task.stage_id]
+                    stage = task.stage
                     executor = self.executors.get(launched_task.eid, None)
             if executor:
                 executor.release()

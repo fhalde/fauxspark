@@ -3,10 +3,64 @@
         "id": 0,
         "deps": [],
         "status": "pending",
+        "distribution": {
+            "input": {
+                "size": "1024 MiB",
+                "partitions": 2,
+                "kind": "uniform"
+            },
+            "output": {
+                "partitions": 200,
+                "ratio": 0.5,
+                "kind": "uniform"
+            }
+        },
         "stats": {
-            "avg": 5.0
+            "avg": 100
         },
         "partitions": 2,
+        "tasks": []
+    },
+    {
+        "id": 1,
+        "deps": [],
+        "status": "pending",
+        "input": {
+            "size": "1024 MiB",
+            "partitions": 200,
+            "distribution": {
+                "kind": "uniform"
+            }
+        },
+        "output": {
+            "ratio": 0.7,
+            "partitions": 200,
+            "distribution": {
+                "kind": "uniform"
+            }
+        },
+        "stats": {
+            "throughput": "100 MiB",
+            "avg": 100
+        },
+        "partitions": 2,
+        "tasks": []
+    },
+    {
+        "id": 0,
+        "deps": [1, 2],
+        "status": "pending",
+        "output": {
+            "ratio": 0.5,
+            "partitions": 200,
+            "distribution": {
+                "kind": "uniform"
+            }
+        },
+        "stats": {
+            "avg": 100
+        },
+        "partitions": 200,
         "tasks": []
     }
 ]
