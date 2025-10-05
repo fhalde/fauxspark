@@ -2,6 +2,9 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, List, Mapping, Optional
 from colorama import Fore, Style
 import numpy as np
+import humanfriendly
+from pydantic import field_validator, computed_field
+from . import dist
 
 
 class Input(BaseModel):
@@ -9,7 +12,20 @@ class Input(BaseModel):
     size: int
     partitions: int
     distribution: dict[Any, Any]
-    weights: np.ndarray
+
+    @computed_field
+    @property
+    def weights(self) -> np.ndarray:
+        return dist.weights(self.distribution, self.partitions)
+
+    @field_validator("size", mode="before")
+    def validate_size(cls, v: str) -> int:
+        if isinstance(v, int):
+            return v
+        try:
+            return humanfriendly.parse_size(v)
+        except Exception as e:
+            raise ValueError(f"Invalid size format: {v!r} ({e})")
 
 
 class Output(BaseModel):
@@ -17,7 +33,11 @@ class Output(BaseModel):
     ratio: float
     partitions: int
     distribution: dict[Any, Any]
-    weights: np.ndarray
+
+    @computed_field
+    @property
+    def weights(self) -> np.ndarray:
+        return dist.weights(self.distribution, self.partitions)
 
 
 class Stage(BaseModel):

@@ -47,8 +47,8 @@
         "tasks": []
     },
     {
-        "id": 0,
-        "deps": [1, 2],
+        "id": 2,
+        "deps": [0, 1],
         "status": "pending",
         "output": {
             "ratio": 0.5,

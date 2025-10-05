@@ -1,57 +1,44 @@
 import numpy as np
-import simpy
 
 
-def uniform(_, n: int) -> list[float]:
-    w = np.ones(n)
+def uniform(_, n: int) -> np.ndarray:
+    w = np.ones(n).astype(np.float64)
     w /= w.sum()
     return w
 
 
-def zipf(dist: dict, n: int) -> list[float]:
+def zipf(dist: dict, n: int) -> np.ndarray:
     alpha = dist["alpha"]
-    w = np.random.zipf(alpha, n).astype(float)
+    w = np.random.zipf(alpha, n).astype(np.float64)
     w /= w.sum()
     return w
 
 
-def normal(dist: dict, n: int) -> list[float]:
+def normal(dist: dict, n: int) -> np.ndarray:
     mu = dist["loc"]
     sigma = dist["scale"]
-    w = np.random.normal(mu, sigma, n).astype(float)
+    w = np.random.normal(mu, sigma, n).astype(np.float64)
     w /= w.sum()
     return w
 
 
-def pareto(dist: dict, n: int) -> list[float]:
+def pareto(dist: dict, n: int) -> np.ndarray:
     alpha = dist["alpha"]
-    w = np.random.pareto(alpha, n).astype(float)
+    w = np.random.pareto(alpha, n).astype(np.float64)
     w /= w.sum()
     return w
 
 
-def exponential(dist: dict, n: int) -> list[float]:
+def exponential(dist: dict, n: int) -> np.ndarray:
     scale = dist["scale"]
-    w = np.random.exponential(scale, n)
+    w = np.random.exponential(scale, n).astype(np.float64)
     w /= w.sum()
     return w
 
 
-def weights(dist: dict, n: int) -> list[float]:
+def weights(dist: dict, n: int) -> np.ndarray:
     kind = dist["kind"]
     func = globals().get(kind)
     if func is None:
         raise ValueError(f"Unknown distribution kind: {kind}")
     return func(dist, n)
-
-
-def net():
-    from ns.flow.cc import TCPReno
-    from ns.flow.cubic import TCPCubic
-    from ns.flow.flow import AppType, Flow
-    from ns.packet.tcp_generator import TCPPacketGenerator
-    from ns.packet.tcp_sink import TCPSink
-    from ns.port.wire import Wire
-    from ns.switch.switch import SimplePacketSwitch
-
-    env = simpy.Environment()

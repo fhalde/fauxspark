@@ -11,7 +11,6 @@ from typing import Generator, Any
 import sys
 from pydantic import TypeAdapter
 from .models import Stage
-from . import dist
 
 
 def main(DAG: list[Stage], args: argparse.Namespace) -> None:
@@ -165,14 +164,6 @@ def cli() -> None:
         with open(args.file, "r") as f:
             dag = TypeAdapter(list[Stage]).validate_python(json.load(f))
             for stage in dag:
-                if stage.input:
-                    stage.input.weights = dist.weights(
-                        stage.input.distribution, stage.input.partitions
-                    )
-                if stage.output:
-                    stage.output.weights = dist.weights(
-                        stage.output.distribution, stage.output.partitions
-                    )
                 stage.tasks = [
                     Task(index=i, status="pending", stage=stage) for i in range(stage.partitions)
                 ]
