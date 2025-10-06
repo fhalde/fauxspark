@@ -3,6 +3,8 @@ import json
 import os
 import simpy
 from colorama import init, Fore, Style
+
+from fauxspark import dist
 from .scheduler import Scheduler
 from .executor import Executor
 from .models import ExecutorKilled, Task
@@ -11,6 +13,7 @@ from typing import Generator, Any
 import sys
 from pydantic import TypeAdapter
 from .models import Stage
+import numpy as np
 
 
 def main(DAG: list[Stage], args: argparse.Namespace) -> None:
@@ -85,6 +88,7 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
 
 
 def cli() -> None:
+    np.set_printoptions(precision=4, suppress=True)
     init(autoreset=True)
     os.environ["PYTHONUNBUFFERED"] = "1"
 
@@ -164,6 +168,25 @@ def cli() -> None:
         with open(args.file, "r") as f:
             dag = TypeAdapter(list[Stage]).validate_python(json.load(f))
             for stage in dag:
+                if stage.input:
+                    stage.input.splits = (
+                        dist.weights(stage.input.distribution, stage.input.partitions)
+                        * stage.input.size
+                    )
+                    w = dist.weights(stage.output.distribution, stage.output.partitions)
+                    stage.output.splits = (
+                        ((stage.input.splits * np.array(stage.output.ratio))[:, None]) * w
+                    )
+                else:
+                    collapsed = np.sum(
+                        [
+                            ratio * dag[dep].output.splits.sum(axis=0)
+                            for ratio, dep in zip(stage.output.ratio, stage.deps)
+                        ],
+                        axis=0,
+                    )
+                    w = dist.weights(stage.output.distribution, stage.output.partitions)
+                    stage.output.splits = collapsed[:, None] * w
                 stage.tasks = [
                     Task(index=i, status="pending", stage=stage) for i in range(stage.partitions)
                 ]

@@ -1,10 +1,8 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Any, List, Mapping, Optional
 from colorama import Fore, Style
 import numpy as np
-import humanfriendly
-from pydantic import field_validator, computed_field
-from . import dist
+import humanfriendly as hf
 
 
 class Input(BaseModel):
@@ -12,32 +10,21 @@ class Input(BaseModel):
     size: int
     partitions: int
     distribution: dict[Any, Any]
-
-    @computed_field
-    @property
-    def weights(self) -> np.ndarray:
-        return dist.weights(self.distribution, self.partitions)
+    splits: Optional[np.ndarray] = None
 
     @field_validator("size", mode="before")
-    def validate_size(cls, v: str) -> int:
-        if isinstance(v, int):
-            return v
-        try:
-            return humanfriendly.parse_size(v)
-        except Exception as e:
-            raise ValueError(f"Invalid size format: {v!r} ({e})")
+    def validate_size(cls, v: Any) -> int:
+        if isinstance(v, str):
+            return hf.parse_size(v)
+        return v
 
 
 class Output(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    ratio: float
+    ratio: List[float]
     partitions: int
     distribution: dict[Any, Any]
-
-    @computed_field
-    @property
-    def weights(self) -> np.ndarray:
-        return dist.weights(self.distribution, self.partitions)
+    splits: Optional[np.ndarray] = None
 
 
 class Stage(BaseModel):
@@ -46,9 +33,16 @@ class Stage(BaseModel):
     status: str
     partitions: int
     stats: Mapping[Any, Any]
-    tasks: List["Task"]
     input: Optional[Input] = None
     output: Optional[Output] = None
+    tasks: List["Task"]
+    throughput: float
+
+    @field_validator("throughput", mode="before")
+    def validate_throughput(cls, v: Any) -> float:
+        if isinstance(v, str):
+            return hf.parse_size(v)
+        return v
 
     def __repr__(self: "Stage") -> str:
         return f"{Fore.CYAN}Stage{Style.RESET_ALL}(id={self.id}, status={self.status}, deps={self.deps})"

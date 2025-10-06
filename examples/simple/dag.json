@@ -1,66 +1,80 @@
 [
-    {
-        "id": 0,
-        "deps": [],
-        "status": "pending",
-        "distribution": {
-            "input": {
-                "size": "1024 MiB",
-                "partitions": 2,
-                "kind": "uniform"
-            },
-            "output": {
-                "partitions": 200,
-                "ratio": 0.5,
-                "kind": "uniform"
-            }
-        },
-        "stats": {
-            "avg": 100
-        },
-        "partitions": 2,
-        "tasks": []
+  {
+    "id": 0,
+    "deps": [],
+    "status": "pending",
+    "input": {
+      "size": "1024 MB",
+      "partitions": 5,
+      "distribution": {
+        "kind": "uniform"
+      }
     },
-    {
-        "id": 1,
-        "deps": [],
-        "status": "pending",
-        "input": {
-            "size": "1024 MiB",
-            "partitions": 200,
-            "distribution": {
-                "kind": "uniform"
-            }
-        },
-        "output": {
-            "ratio": 0.7,
-            "partitions": 200,
-            "distribution": {
-                "kind": "uniform"
-            }
-        },
-        "stats": {
-            "throughput": "100 MiB",
-            "avg": 100
-        },
-        "partitions": 2,
-        "tasks": []
+    "output": {
+      "partitions": 20,
+      "ratio": [
+        1.0
+      ],
+      "distribution": {
+        "kind": "uniform"
+      }
     },
-    {
-        "id": 2,
-        "deps": [0, 1],
-        "status": "pending",
-        "output": {
-            "ratio": 0.5,
-            "partitions": 200,
-            "distribution": {
-                "kind": "uniform"
-            }
-        },
-        "stats": {
-            "avg": 100
-        },
-        "partitions": 200,
-        "tasks": []
-    }
+    "stats": {
+      "avg": 100
+    },
+    "throughput": "100 MB",
+    "partitions": 5,
+    "tasks": []
+  },
+  {
+    "id": 1,
+    "deps": [],
+    "status": "pending",
+    "input": {
+      "size": "1024 MB",
+      "partitions": 5,
+      "distribution": {
+        "kind": "uniform"
+      }
+    },
+    "output": {
+      "ratio": [
+        1.0
+      ],
+      "partitions": 20,
+      "distribution": {
+        "kind": "uniform"
+      }
+    },
+    "stats": {
+      "avg": 100
+    },
+    "throughput": "100 MB",
+    "partitions": 5,
+    "tasks": []
+  },
+  {
+    "id": 2,
+    "deps": [
+      0,
+      1
+    ],
+    "status": "pending",
+    "output": {
+      "ratio": [
+        1.0,
+        1.0
+      ],
+      "partitions": 20,
+      "distribution": {
+        "kind": "uniform"
+      }
+    },
+    "stats": {
+      "avg": 100
+    },
+    "throughput": "100 MB",
+    "partitions": 20,
+    "tasks": []
+  }
 ]
