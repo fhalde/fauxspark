@@ -3,23 +3,36 @@
         "id": 0,
         "deps": [],
         "status": "pending",
-        "stats": {
-            "avg": 5.0
+        "input": {
+            "size": "1024 GB",
+            "partitions": 10,
+            "distribution": {
+                "kind": "uniform"
+            }
         },
-        "partitions": 2,
+        "output": {
+            "partitions": 10,
+            "ratio": [1.0],
+            "distribution": {
+                "kind": "pareto",
+                "alpha": 1.5
+            }
+        },
+        "throughput": "102.4 MB",
         "tasks": []
     },
     {
         "id": 1,
         "deps": [0],
         "status": "pending",
-        "stats": {
-            "shuffle": {
-                "avg": 0.0
-            },
-            "avg": 5.0
+        "output": {
+            "partitions": 10,
+            "ratio": [1.0],
+            "distribution": {
+                "kind": "uniform"
+            }
         },
-        "partitions": 4,
+        "throughput": "102.4 MB",
         "tasks": []
     }
 ]

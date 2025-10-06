@@ -5,13 +5,13 @@
     "status": "pending",
     "input": {
       "size": "1024 MB",
-      "partitions": 5,
+      "partitions": 10,
       "distribution": {
         "kind": "uniform"
       }
     },
     "output": {
-      "partitions": 20,
+      "partitions": 10,
       "ratio": [
         1.0
       ],
@@ -19,50 +19,7 @@
         "kind": "uniform"
       }
     },
-    "throughput": "100 MB",
-    "tasks": []
-  },
-  {
-    "id": 1,
-    "deps": [],
-    "status": "pending",
-    "input": {
-      "size": "1024 MB",
-      "partitions": 5,
-      "distribution": {
-        "kind": "uniform"
-      }
-    },
-    "output": {
-      "ratio": [
-        1.0
-      ],
-      "partitions": 20,
-      "distribution": {
-        "kind": "uniform"
-      }
-    },
-    "throughput": "100 MB",
-    "tasks": []
-  },
-  {
-    "id": 2,
-    "deps": [
-      0,
-      1
-    ],
-    "status": "pending",
-    "output": {
-      "ratio": [
-        1.0,
-        1.0
-      ],
-      "partitions": 20,
-      "distribution": {
-        "kind": "uniform"
-      }
-    },
-    "throughput": "100 MB",
+    "throughput": "102.4 MB",
     "tasks": []
   }
 ]

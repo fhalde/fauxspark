@@ -14,9 +14,11 @@ class Input(BaseModel):
 
     @field_validator("size", mode="before")
     def validate_size(cls, v: Any) -> int:
+        if isinstance(v, int):
+            return v
         if isinstance(v, str):
             return hf.parse_size(v)
-        return v
+        raise ValueError(f"Invalid size: {v}")
 
 
 class Output(BaseModel):
@@ -38,9 +40,11 @@ class Stage(BaseModel):
 
     @field_validator("throughput", mode="before")
     def validate_throughput(cls, v: Any) -> float:
+        if isinstance(v, float):
+            return v
         if isinstance(v, str):
             return hf.parse_size(v)
-        return v
+        raise ValueError(f"Invalid throughput: {v}")
 
     def __repr__(self: "Stage") -> str:
         return f"{Fore.CYAN}Stage{Style.RESET_ALL}(id={self.id}, status={self.status}, deps={self.deps})"

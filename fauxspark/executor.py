@@ -97,9 +97,6 @@ class Executor(object):
                     else:
                         self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
                         return
-            self.logger(
-                f"task={tid} input_bytes={input_bytes} throughput={stage.throughput} in time={input_bytes / stage.throughput}"
-            )
             yield self.env.timeout(input_bytes / stage.throughput)
             self.queue.put(StatusUpdate(tid=tid, status="completed", eid=self.id))
         except simpy.Interrupt as e:
