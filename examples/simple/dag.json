@@ -19,11 +19,7 @@
         "kind": "uniform"
       }
     },
-    "stats": {
-      "avg": 100
-    },
     "throughput": "100 MB",
-    "partitions": 5,
     "tasks": []
   },
   {
@@ -46,11 +42,7 @@
         "kind": "uniform"
       }
     },
-    "stats": {
-      "avg": 100
-    },
     "throughput": "100 MB",
-    "partitions": 5,
     "tasks": []
   },
   {
@@ -70,11 +62,7 @@
         "kind": "uniform"
       }
     },
-    "stats": {
-      "avg": 100
-    },
     "throughput": "100 MB",
-    "partitions": 20,
     "tasks": []
   }
 ]

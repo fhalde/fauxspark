@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
-from typing import Any, List, Mapping, Optional
+from typing import Any, Optional
 from colorama import Fore, Style
 import numpy as np
 import humanfriendly as hf
@@ -21,7 +21,7 @@ class Input(BaseModel):
 
 class Output(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    ratio: List[float]
+    ratio: list[float]
     partitions: int
     distribution: dict[Any, Any]
     splits: Optional[np.ndarray] = None
@@ -29,13 +29,11 @@ class Output(BaseModel):
 
 class Stage(BaseModel):
     id: int
-    deps: List[int]
+    deps: list[int]
     status: str
-    partitions: int
-    stats: Mapping[Any, Any]
     input: Optional[Input] = None
     output: Optional[Output] = None
-    tasks: List["Task"]
+    tasks: list["Task"]
     throughput: float
 
     @field_validator("throughput", mode="before")

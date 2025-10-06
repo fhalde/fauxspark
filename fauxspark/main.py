@@ -3,15 +3,12 @@ import json
 import os
 import simpy
 from colorama import init, Fore, Style
-
-from fauxspark import dist
 from .scheduler import Scheduler
 from .executor import Executor
-from .models import ExecutorKilled, Task
+from .models import ExecutorKilled
 from . import util
 from typing import Generator, Any
 import sys
-from pydantic import TypeAdapter
 from .models import Stage
 import numpy as np
 
@@ -166,30 +163,7 @@ def cli() -> None:
 
     try:
         with open(args.file, "r") as f:
-            dag = TypeAdapter(list[Stage]).validate_python(json.load(f))
-            for stage in dag:
-                if stage.input:
-                    stage.input.splits = (
-                        dist.weights(stage.input.distribution, stage.input.partitions)
-                        * stage.input.size
-                    )
-                    w = dist.weights(stage.output.distribution, stage.output.partitions)
-                    stage.output.splits = (
-                        ((stage.input.splits * np.array(stage.output.ratio))[:, None]) * w
-                    )
-                else:
-                    collapsed = np.sum(
-                        [
-                            ratio * dag[dep].output.splits.sum(axis=0)
-                            for ratio, dep in zip(stage.output.ratio, stage.deps)
-                        ],
-                        axis=0,
-                    )
-                    w = dist.weights(stage.output.distribution, stage.output.partitions)
-                    stage.output.splits = collapsed[:, None] * w
-                stage.tasks = [
-                    Task(index=i, status="pending", stage=stage) for i in range(stage.partitions)
-                ]
+            dag = util.init_dag(json.load(f))
     except FileNotFoundError:
         print(f"Error: DAG file '{args.file}' not found")
         sys.exit(1)
