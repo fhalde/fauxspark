@@ -104,11 +104,11 @@ Let's run the simulation:
  10.00: [main        ] utilization: 1.0
  10.00: [main        ] job completed successfully
 ```
-You don’t need a simulator to predict this, @fhalde! Well, almost... hang on.
-
-In Spark (by default), each task acquires a single core. With 1 executor and 1 core, all tasks execute sequentially. Each task processes a partition of size 102.4 MB, and with an executor throughput of 102.4 MB/s, each task takes 1 second. Executed sequentially, the total runtime is 10 seconds.
+Execution time 10s. In Spark each task acquires a single core (by default). With 1 executor and 1 core, all tasks execute sequentially. Each task processes a partition of size 102.4 MB. So with an executor throughput of 102.4 MB/s, each task takes 1 second. Executed sequentially, the total runtime is 10 seconds.
 
 Since the simulator is currently idealized, it reports 100% utilization.
+
+You don't need a simulator to predict this! Well, almost... hang on.
 
 A few more runs:
 ```
@@ -125,20 +125,16 @@ A few more runs:
   3.00: [main        ] job completed successfully
 ```
 
-Two interesting observations:
+Two observations:
 
-1. Note how the execution time didn't just shrink by half (5.0 ➜ 3.0)
+1. The execution time didn't shrink by half unlike before (5.0 ➜ 3.0)
 2. The utilization dropped by ~16%
 
-So why isn't the execution time a simple division of T / C i.e. 10 (tasks) / 4 (cores) = 2.5?
-The formula above assumes every core has contributed equally to the completion of all the tasks. With 4 cores, an executor can process 4 tasks in parallel. That's 4 (1s), then 4 (1s), then ... 2 (1s) = 3s. The last batch still takes 1s to complete. In Spark, a task is the smallest unit of parallelism.
+There's nothing surprising about #1, it's just the number of tasks was not divisble by the cores. Looking at the schedule, we have 4 tasks scheduled in the first batch (1s), then another batch of 4 tasks (1s), and finally 2 tasks (1s) totaling to 3s.
 
 To understand utilization, we first need to define it. In the simulator, utilization is defined as:
-> Σ task.runtime) / (Σ executor.uptime * executor.cores
+> Σ task.runtime / Σ executor.uptime * executor.cores
 
-Since the third batch left two cores idle, the utilization dropped.
+In our example, the last batch consisted of only 2 tasks, each using 1 core, leaving the remaining 2 cores underutilized hence the drop.
 
 Alright, this was fun, but it still doesn't justify building a simulator.
-
-I used the uniform distribution to keep things simple. In reality, datasets are rarely, if ever, uniformly distributed.
-
