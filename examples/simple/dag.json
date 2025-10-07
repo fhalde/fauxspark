@@ -1,12 +1,25 @@
 [
-    {
-        "id": 0,
-        "deps": [],
-        "status": "pending",
-        "stats": {
-            "avg": 5.0
-        },
-        "partitions": 2,
-        "tasks": []
-    }
+  {
+    "id": 0,
+    "deps": [],
+    "status": "pending",
+    "input": {
+      "size": "1024 MB",
+      "partitions": 10,
+      "distribution": {
+        "kind": "uniform"
+      }
+    },
+    "output": {
+      "partitions": 10,
+      "ratio": [
+        1.0
+      ],
+      "distribution": {
+        "kind": "uniform"
+      }
+    },
+    "throughput": "102.4 MB",
+    "tasks": []
+  }
 ]

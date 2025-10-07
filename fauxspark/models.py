@@ -1,15 +1,50 @@
-from pydantic import BaseModel, Field
-from typing import Any, List, Mapping, Optional
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+from typing import Any, Optional
 from colorama import Fore, Style
+import numpy as np
+import humanfriendly as hf
+
+
+class Input(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    size: int
+    partitions: int
+    distribution: dict[Any, Any]
+    splits: Optional[np.ndarray] = None
+
+    @field_validator("size", mode="before")
+    def validate_size(cls, v: Any) -> int:
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str):
+            return hf.parse_size(v)
+        raise ValueError(f"Invalid size: {v}")
+
+
+class Output(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    ratio: list[float]
+    partitions: int
+    distribution: dict[Any, Any]
+    splits: Optional[np.ndarray] = None
 
 
 class Stage(BaseModel):
     id: int
-    deps: List[int]
+    deps: list[int]
     status: str
-    partitions: int
-    stats: Mapping[Any, Any]
-    tasks: List["Task"]
+    input: Optional[Input] = None
+    output: Optional[Output] = None
+    tasks: list["Task"]
+    throughput: float
+
+    @field_validator("throughput", mode="before")
+    def validate_throughput(cls, v: Any) -> float:
+        if isinstance(v, float):
+            return v
+        if isinstance(v, str):
+            return hf.parse_size(v)
+        raise ValueError(f"Invalid throughput: {v}")
 
     def __repr__(self: "Stage") -> str:
         return f"{Fore.CYAN}Stage{Style.RESET_ALL}(id={self.id}, status={self.status}, deps={self.deps})"
@@ -18,12 +53,12 @@ class Stage(BaseModel):
 class Task(BaseModel):
     index: int
     status: str
-    stage_id: int
+    stage: "Stage"
     current: Optional[int] = None
     launched_tasks: dict[int, "LaunchTask"] = Field(default_factory=dict)
 
     def __repr__(self: "Task") -> str:
-        return f"{Fore.GREEN}Task{Style.RESET_ALL}(stage={self.stage_id}, index={self.index}, status={self.status})"
+        return f"{Fore.GREEN}Task{Style.RESET_ALL}(stage={self.stage.id}, index={self.index}, status={self.status})"
 
 
 class LaunchTask(BaseModel):
@@ -31,10 +66,6 @@ class LaunchTask(BaseModel):
     eid: int
     task: "Task"
     status: str
-
-    @property
-    def stage_id(self: "LaunchTask") -> int:
-        return self.task.stage_id
 
     def __repr__(self: "LaunchTask") -> str:
         return f"{Fore.YELLOW}LaunchTask{Style.RESET_ALL}(id={self.tid}, executor_id={self.eid}, status={self.status}, task={self.task!r})"

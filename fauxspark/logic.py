@@ -5,7 +5,7 @@ from .executor import Executor
 
 def next_available_executor(executors: dict[int, Executor]) -> Optional[Executor]:
     for executor in executors.values():
-        if executor.available_slots > 0:
+        if executor.cores_free > 0:
             return executor
     return None
 

@@ -30,6 +30,12 @@ class Scheduler(object):
     def start(self: "Scheduler") -> simpy.Process:
         return self.env.process(self.loop())
 
+    @property
+    def available_executors(self: "Scheduler") -> dict[int, Executor]:
+        return {
+            executor.id: executor for executor in self.executors.values() if not executor.killed
+        }
+
     def loop(self: "Scheduler") -> Generator[typing.Any, None, None]:
         while True:
             self.schedule_runnable_tasks()
@@ -52,7 +58,7 @@ class Scheduler(object):
                     self.logger(f"unhandled: {event!r}")
 
     def schedule_runnable_tasks(self: "Scheduler") -> None:
-        while (executor := next_available_executor(self.executors)) and (
+        while (executor := next_available_executor(self.available_executors)) and (
             taskset := runnable_tasks(self.DAG)
         ) != []:
             stage, task = taskset.pop(0)
@@ -78,13 +84,13 @@ class Scheduler(object):
                 task = launched_task.task
                 task.status, task.current = "killed", None
                 launched_task.status = "killed"
-        del self.executors[executor.id]
+        # del self.executors[executor.id]
 
     def fetch_failed(self: "Scheduler", fetch_failed: FetchFailed) -> None:
         launch_task = self.scheduled.pop(fetch_failed.tid, None)
         if launch_task:
             task = launch_task.task
-            current_stage = self.DAG[task.stage_id]
+            current_stage = task.stage
             current_stage.status = "pending"
             for task in current_stage.tasks:
                 if task.current:
@@ -93,7 +99,7 @@ class Scheduler(object):
             parent_stage = self.DAG[fetch_failed.dep]
             parent_stage.status = "failed"
             for task in parent_stage.tasks:
-                if task.launched_tasks[task.current].eid not in self.executors:  # type: ignore
+                if task.launched_tasks[task.current].eid not in self.available_executors:
                     task.status, task.current = "pending", None
             executor = self.executors.get(launch_task.eid, None)
             if executor:
@@ -109,14 +115,14 @@ class Scheduler(object):
                 case "completed":
                     task.status, task.current = "completed", status_update.tid
                     launched_task.status = "completed"
-                    stage = self.DAG[task.stage_id]
+                    stage = task.stage
                     if all(task.status == "completed" for task in stage.tasks):
                         stage.status = "completed"
                     executor = self.executors.get(launched_task.eid, None)
                 case "killed":
                     task.status, task.current = "killed", None
                     launched_task.status = "killed"
-                    stage = self.DAG[task.stage_id]
+                    stage = task.stage
                     executor = self.executors.get(launched_task.eid, None)
             if executor:
                 executor.release()
