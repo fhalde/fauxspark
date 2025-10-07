@@ -14,6 +14,7 @@ This simulator intends to fill that gap by allowing users to experiment and obse
 
 Like any simulator, the numbers produced here are approximate & may differ from real-world behavior, and are only as accurate as the model. **The plan of course is to make the model better** 😀
 
+A [walkthrough](https://github.com/fhalde/fauxspark/edit/main/README.md#walkthrough) demonstrating how to use this tool is provided below.
 ## Getting Started
 
 ```bash
@@ -68,3 +69,64 @@ Planned enhancements:
 Some stretch goals:
 - Modeling Network & Disk IO (e.g., network bandwidth to observe changes in shuffle performance, spills)
 - Adaptive Query Execution (AQE) behavior
+
+## Walkthrough
+
+Consider a straightforward SQL query.
+```sql
+SELECT * FROM foo;
+```
+which may be represented using the [examples/simple/dag.json](https://github.com/fhalde/fauxspark/blob/main/examples/simple/dag.json).
+```json
+[
+  {
+    "id": 0,
+    "deps": [],
+    "status": "pending",
+    "input": {
+      "size": "1024 MB",
+      "partitions": 10,
+      "distribution": {
+        "kind": "uniform"
+      }
+    }
+    "throughput": "102.4 MB",
+    "tasks": []
+  }
+]
+
+```
+This is a single stage query (no shuffle) reading an input of 1024 MB, uniformly distributed across 10 equal partitions. Based on historical analysis, our executor throughput for such an RDD is 102.4 MB/s.
+
+Let's run the simulation:
+```bash
+(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json
+ 10.00: [main        ] utilization: 1.0
+ 10.00: [main        ] job completed successfully
+```
+You don’t need a simulator to predict this, @fhalde! Well, almost... hang on.
+
+In Spark (by default), each task acquires a single core. With 1 executor and 1 core, all tasks execute sequentially. Each task processes a partition of size 102.4 MB, and with an executor throughput of 102.4 MB/s, each task takes 1 second. Executed sequentially, the total runtime is 10 seconds.
+
+Since the simulator is currently idealized, it reports 100% utilization.
+
+A few more runs:
+```
+# double the cores
+(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 2
+  5.00: [main        ] utilization: 1.0
+  5.00: [main        ] job completed successfully
+```
+
+```
+# and again
+(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 4
+  3.00: [main        ] utilization: 0.8333333333333334
+  3.00: [main        ] job completed successfully
+```
+
+Two interesting observations:
+
+1. Note how the execution time didn't just shrink by half (5.0 ➜ 3.0)
+2. The utilization dropped by ~16%
+
