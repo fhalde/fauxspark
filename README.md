@@ -96,19 +96,15 @@ which may be represented using the [examples/simple/dag.json](https://github.com
 ]
 
 ```
-This is a single stage query (no shuffle) reading an input of 1024 MB, uniformly distributed across 10 equal partitions. Based on historical analysis, our executor throughput for such an RDD is 102.4 MB/s.
+This is a single stage query (no shuffle) reading an input of 1024 MB uniformly distributed across 10 partitions. Based on historical analysis, our executor throughput is 102.4 MB/s.
 
 Let's run the simulation:
 ```bash
-(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json
+(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json # 1 executor, 1 core (default parameters)
  10.00: [main        ] utilization: 1.0
  10.00: [main        ] job completed successfully
 ```
-Execution time 10s. In Spark each task acquires a single core (by default). With 1 executor and 1 core, all tasks execute sequentially. Each task processes a partition of size 102.4 MB. So with an executor throughput of 102.4 MB/s, each task takes 1 second. Executed sequentially, the total runtime is 10 seconds.
-
-Since the simulator is currently idealized, it reports 100% utilization.
-
-You don't need a simulator to predict this! Well, almost... hang on.
+10 seconds. Since the simulator is currently idealized, the utilization is 100%. `time` reports the simulation completed in just under 0.09s.
 
 A few more runs:
 ```
@@ -130,11 +126,11 @@ Two observations:
 1. The execution time didn't shrink by half unlike before (5.0 ➜ 3.0)
 2. The utilization dropped by ~16%
 
-There's nothing surprising about #1, it's just the number of tasks was not divisble by the cores. Looking at the schedule, we have 4 tasks scheduled in the first batch (1s), then another batch of 4 tasks (1s), and finally 2 tasks (1s) totaling to 3s.
+There's nothing surprising about #1. The number of tasks was not divisble by the cores. Looking at the schedule more closely, we have 4 tasks scheduled in the first batch (1s), then another batch of 4 tasks (1s), and finally 2 tasks (1s) totaling to 3s.
 
 To understand utilization, we first need to define it. In the simulator, utilization is defined as:
 > Σ task.runtime / Σ executor.uptime * executor.cores
 
-In our example, the last batch consisted of only 2 tasks, each using 1 core, leaving the remaining 2 cores underutilized hence the drop.
+In our example, the last batch kept 2 cores idle hence the drop in utilization.
 
-Alright, this was fun, but it still doesn't justify building a simulator.
+... TBD shuffle
