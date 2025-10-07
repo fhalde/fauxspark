@@ -1,4 +1,5 @@
 import argparse
+import random
 from fractions import Fraction
 import json
 import os
@@ -77,6 +78,7 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
 
     env.run()
     # stats
+    stats = {}
     computed = sum([executor.computed for executor in scheduler.executors.values()])
     total = sum(
         [
@@ -85,9 +87,12 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
         ]
     )
     eff = computed / total
+    stats["utilization"] = eff
+    stats["runtime"] = env.now
     util.log(env, "main", f"{Fore.YELLOW}utilization: {eff}")
     if all(stage.status == "completed" for stage in scheduler.DAG):
         util.log(env, "main", f"{Fore.GREEN}job completed successfully")
+        util.log(env, "report", f"{Fore.WHITE}{json.dumps(stats)}")
     else:
         util.log(env, "main", f"{Fore.RED}job did not complete{Style.RESET_ALL}\n{DAG}")
         for stage in scheduler.DAG:
@@ -169,8 +174,17 @@ def cli() -> None:
         help="Set the delay (in seconds) it takes to replace an executor on failure (default: 1).",
     )
 
-    args = parser.parse_args()
+    parser.add_argument(
+        "--seed",
+        default=None,
+        type=int,
+        help="Set the seed for the random number generator.",
+    )
 
+    args = parser.parse_args()
+    seed = args.seed or random.randint(0, 1000000)
+    np.random.seed(seed)
+    print(f"random seed: {seed}")
     try:
         with open(args.file, "r") as f:
             dag = util.init_dag(json.load(f))
