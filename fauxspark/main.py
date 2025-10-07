@@ -1,4 +1,5 @@
 import argparse
+from fractions import Fraction
 import json
 import os
 import simpy
@@ -23,7 +24,6 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
         executor = Executor(
             env=env,
             DAG=DAG,
-            executors=scheduler.executors,
             id=i,
             cores=args.cores,
             queue=simpy.Store(env),
@@ -76,6 +76,16 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
         env.process(simulate_auto_replace(t))
 
     env.run()
+    # stats
+    computed = sum([executor.computed for executor in scheduler.executors.values()])
+    total = sum(
+        [
+            ((executor.end_time or env.now) - executor.start_time) * executor.cores
+            for executor in scheduler.executors.values()
+        ]
+    )
+    eff = computed / total
+    util.log(env, "main", f"{Fore.YELLOW}utilization: {eff}")
     if all(stage.status == "completed" for stage in scheduler.DAG):
         util.log(env, "main", f"{Fore.GREEN}job completed successfully")
     else:

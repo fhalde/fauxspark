@@ -16,7 +16,6 @@ class Executor(object):
         self,
         env: simpy.Environment,
         DAG: list[Stage],
-        executors: Mapping[int, "Executor"],
         id: int,
         cores: int,
         queue: simpy.Store,
@@ -26,7 +25,6 @@ class Executor(object):
         self.env = env
         self.DAG = DAG
         self.id = id
-        self.executors = executors
         self.cores = cores
         self.cores_free = cores
         self.logger = partial(util.log, env, f"executor-{self.id}")
@@ -35,6 +33,13 @@ class Executor(object):
         self.scheduler = scheduler
         self.taskprocs: dict[int, simpy.Process] = dict()
         self.fetchprocs: dict[int, simpy.Process] = dict()
+        self.start_time = env.now
+        self.end_time = None
+        self.computed = 0
+
+    @property
+    def killed(self: "Executor") -> bool:
+        return self.end_time is not None
 
     def start(self: "Executor") -> simpy.Process:
         return self.env.process(self.loop())
@@ -68,6 +73,7 @@ class Executor(object):
                     self.logger(f"unhandled: {event!r}")
 
     def taskproc(self, launch_task: LaunchTask) -> Generator[typing.Any, None, None]:
+        start_time = self.env.now
         tid = launch_task.tid
         stage = launch_task.task.stage
         try:
@@ -81,7 +87,9 @@ class Executor(object):
                     return
                 for task in self.DAG[dep].tasks:
                     current = task.launched_tasks.get(task.current, None)  # type: ignore
-                    if current and (executor := self.executors.get(current.eid, None)):
+                    if current and (
+                        executor := self.scheduler.available_executors.get(current.eid, None)
+                    ):
                         if current.eid == self.id:  # local fetch
                             input_bytes += self.DAG[dep].output.splits[task.index][
                                 launch_task.task.index
@@ -98,11 +106,14 @@ class Executor(object):
                         self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
                         return
             yield self.env.timeout(input_bytes / stage.throughput)
+            self.computed += self.env.now - start_time
             self.queue.put(StatusUpdate(tid=tid, status="completed", eid=self.id))
         except simpy.Interrupt as e:
+            self.computed += self.env.now - start_time
             if e.cause == "killed":
                 self.queue.put(StatusUpdate(tid=tid, status="killed", eid=self.id))
                 return
+            raise e
 
     def fetch(self: "Executor", tid: int, dep: int, sindex: int, dindex: int) -> simpy.Process:
         self.fetchprocs[tid] = self.env.process(self.fetchproc(dep, sindex, dindex))
@@ -121,6 +132,7 @@ class Executor(object):
         for process in list(self.fetchprocs.values()):
             if process.is_alive:
                 process.interrupt("disconnect")
+        self.end_time = self.env.now
 
     def reserve(self: "Executor") -> None:
         self.cores_free -= 1
