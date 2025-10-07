@@ -130,10 +130,11 @@ Two interesting observations:
 1. Note how the execution time didn't just shrink by half (5.0 ➜ 3.0)
 2. The utilization dropped by ~16%
 
-It's expected that the execution time doesn't reduce by half, because individual tasks don't benefit from free cores. With 4 cores, 4 tasks run in parallel. In the third batch, only 2 tasks remain, so 2 cores are idle, and each task still takes 1 second to complete, totaling to 1 (1st batch) + 1 (2nd batch) + 1 (3rd batch) = 3s
+So why isn't the execution time a simple division of T / C i.e. 10 (tasks) / 4 (cores) = 2.5?
+The formula above assumes every core has contributed equally to the completion of all the tasks. With 4 cores, an executor can process 4 tasks in parallel. That's 4 (1s), then 4 (1s), then ... 2 (1s) = 3s. The last batch still takes 1s to complete. In Spark, a task is the smallest unit of parallelism.
 
 To understand utilization, we first need to define it. In the simulator, utilization is defined as:
-> Σ task_runtime) / (Σ executor.uptime * executor.cores
+> Σ task.runtime) / (Σ executor.uptime * executor.cores
 
 Since the third batch left two cores idle, the utilization dropped.
 
