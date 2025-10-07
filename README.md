@@ -130,3 +130,14 @@ Two interesting observations:
 1. Note how the execution time didn't just shrink by half (5.0 ➜ 3.0)
 2. The utilization dropped by ~16%
 
+It's expected that the execution time doesn't reduce by half, because individual tasks don't benefit from free cores. With 4 cores, 4 tasks run in parallel. In the third batch, only 2 tasks remain, so 2 cores are idle, and each task still takes 1 second to complete, totaling to 1 (1st batch) + 1 (2nd batch) + 1 (3rd batch) = 3s
+
+To understand utilization, we first need to define it. In the simulator, utilization is defined as:
+> Σ task_runtime) / (Σ executor.uptime * executor.cores
+
+Since the third batch left two cores idle, the utilization dropped.
+
+Alright, this was fun, but it still doesn't justify building a simulator.
+
+I used the uniform distribution to keep things simple. In reality, datasets are rarely, if ever, uniformly distributed.
+
