@@ -196,4 +196,72 @@ Since our simulation is now stochastic (using random inputs), the outputs will c
 
 > Randomness is seemingly chaotic, yet inherently consistent
 
-Suppose we suspect that our dataset will become skewed over the coming months. How can we forecast and prepare for it?
+Suppose we anticipate that our dataset will skew over the coming months, and your team wants to plan capacity to minimize wasted cost (1 − utilization) while maintaining the target SLA. You could write a optimization function such as [this](https://github.com/fhalde/fauxspark/blob/main/fauxspark/main.py#L203).
+
+This function takes two inputs
+
+- utilization
+- runtime
+  
+and performs 10k simulations for each cluster configuration and selects the ones where the p90 of 10k sim runtimes is below the target SLA and the p10 utilization of 10k sims exceeds the required utilization. I chose p90 and p10 arbitrarily for this example.
+
+Let's be ambitious
+
+```
+>>> m.optimizer(utilization=1, runtime=1)
+```
+| Status | Cores | Utilization (p10) | Runtime (p90) |
+|:------:|------:|----------------:|------------:|
+| 👎     | 1     | 1.0000          | 10.0000     |
+| 👎     | 2     | 0.6491          | 7.7028      |
+| 👎     | 3     | 0.4586          | 7.2678      |
+| 👎     | 4     | 0.3518          | 7.1073      |
+| 👎     | 5     | 0.2847          | 7.0252      |
+| 👎     | 6     | 0.2393          | 6.9648      |
+| 👎     | 7     | 0.2057          | 6.9449      |
+| 👎     | 8     | 0.1805          | 6.9240      |
+| 👎     | 9     | 0.1607          | 6.9129      |
+| 👎     | 10    | 0.1447          | 6.9116      |
+
+_pretty printed markdown table from console logs_
+
+
+It's apparent that under skewed conditions, utilization declines quickly. We might have to sacrifice some $$ for the projected skew or simply mitigate skew altogether.
+```
+>>> m.optimizer(utilization=0.7, runtime=8)
+```
+| Status | Cores | Utilization (p10) | Runtime (p90) |
+|:------:|------:|----------------:|------------:|
+| 👎     | 1     | 1.0000          | 10.0000     |
+| 👎     | 2     | 0.6562          | 7.6200      |
+| 👎     | 3     | 0.4634          | 7.1939      |
+| 👎     | 4     | 0.3558          | 7.0263      |
+| 👎     | 5     | 0.2882          | 6.9407      |
+| 👎     | 6     | 0.2422          | 6.8826      |
+| 👎     | 7     | 0.2080          | 6.8680      |
+| 👎     | 8     | 0.1825          | 6.8484      |
+| 👎     | 9     | 0.1624          | 6.8417      |
+| 👎     | 10    | 0.1462          | 6.8400      |
+
+
+
+```
+>>> m.optimizer(utilization=0.6, runtime=8)
+```
+| Status | Cores | Utilization (p10) | Runtime (p90) |
+|:------:|------:|----------------:|------------:|
+| 👎     | 1     | 1.0000          | 10.0000     |
+| ✅     | 2     | 0.6536          | 7.6503      |
+| 👎     | 3     | 0.4631          | 7.1980      |
+| 👎     | 4     | 0.3553          | 7.0370      |
+| 👎     | 5     | 0.2875          | 6.9559      |
+| 👎     | 6     | 0.2409          | 6.9198      |
+| 👎     | 7     | 0.2071          | 6.8974      |
+| 👎     | 8     | 0.1816          | 6.8832      |
+| 👎     | 9     | 0.1615          | 6.8816      |
+| 👎     | 10    | 0.1453          | 6.8804      |
+
+
+Finally! The simulation is suggesting us that we are better off with just 2 cores that provides us with 65% utilization and a runtime of 7.6s.
+
+By the way, did you notice that despite all the randomness in our simulations, the p10 and p90 percentiles consistently converge?! And that's simulation theory.
