@@ -96,7 +96,7 @@ which could be represented using this json [examples/simple/dag.json](https://gi
 ]
 
 ```
-This is a single stage query (no shuffle) reading an input of 1024 MB uniformly distributed across 10 partitions. Based on historical analysis, we know executor throughput is 102.4 MB/s.
+This is a single stage query (no shuffle) reading an input of 1024 MB uniformly distributed across 10 partitions. Let's assume a single core can process 102.4 MB/s for now.
 
 Let's run the simulation:
 ```bash
@@ -110,15 +110,15 @@ A few more runs:
 ```
 # double the cores
 (fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 2
-  5.00: [main        ] utilization: 1.0
-  5.00: [main        ] job completed successfully
+00:00:05: [main        ] job completed successfully
+00:00:05: [report      ] {"utilization": 1.0, "runtime": 5.0}
 ```
 
 ```
 # and again
 (fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 4
-  3.00: [main        ] utilization: 0.8333333333333334
-  3.00: [main        ] job completed successfully
+00:00:03: [main        ] job completed successfullyutilization: 0.8333333333333334
+00:00:03: [report      ] {"utilization": 0.8333333333333334, "runtime": 3.0}
 ```
 
 Two observations:
@@ -141,7 +141,17 @@ In our example, the last batch kept 2 cores idle hence the drop in utilization.
 
 ----
 
-**The** value of simulation extends beyond this simple example. Real world datasets are rarely uniformly distributed, so let's model that.
+**The** example above didn't really justify a simulator – but neither was the example either!
+
+In practice, jobs:
+
+- process non-uniformly distributed data – often skewed,
+- are often quite complex,
+- may encounter failures during execution.
+
+Analyzing such situations & planning for it can quickly become challenging.
+
+Time to get real: **skews**.
 ```json
 "input": {
   "size": "1024 MB",
