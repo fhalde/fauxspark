@@ -1,6 +1,5 @@
 import argparse
 import random
-from fractions import Fraction
 import json
 import os
 import simpy
@@ -11,7 +10,6 @@ from .models import ExecutorKilled
 from . import util
 from typing import Generator, Any
 import sys
-from .models import Stage
 import numpy as np
 
 
@@ -65,7 +63,7 @@ def main(args: dict[str, Any], seed: int) -> None:
             return
         executor.kill()
         scheduler.scheduler_queue.put(ExecutorKilled(eid=eid))
-        if args["auto_replace"]:
+        if args.get("auto_replace", False):
             yield env.timeout(args["auto_replace_delay"])
             nonlocal last_eid
             executor = mk_executor(last_eid)
@@ -81,10 +79,10 @@ def main(args: dict[str, Any], seed: int) -> None:
         executor.start()
         scheduler.scheduler_queue.put(executor)
 
-    for eid, t in args["sf"]:
+    for eid, t in args.get("sf", []):
         env.process(simulate_failure(eid, t))
 
-    for t in args["sa"]:
+    for t in args.get("sa", []):
         env.process(simulate_auto_replace(t))
 
     env.run()
