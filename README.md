@@ -117,7 +117,7 @@ A few more runs:
 ```
 # and again
 (fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 4
-00:00:03: [main        ] job completed successfullyutilization: 0.8333333333333334
+00:00:03: [main        ] job completed successfully
 00:00:03: [report      ] {"utilization": 0.8333333333333334, "runtime": 3.0}
 ```
 
@@ -149,9 +149,7 @@ In practice, jobs:
 - are often quite complex,
 - may encounter failures during execution.
 
-Analyzing such situations & planning for it can quickly become challenging.
-
-Time to get real: **skews**.
+Analyzing such situations & planning for it can quickly become challenging. For example, let's consider **skews**.
 ```json
 "input": {
   "size": "1024 MB",
@@ -162,5 +160,40 @@ Time to get real: **skews**.
   }
 }
 ```
-This will generate 10 randomly sized partitions that together sum to 1024 MB and are heavily skewed. Far more realistic!
+This will split our 1024 MB input into 10 randomly sized partitions that follow a [Pareto distribution](https://en.wikipedia.org/wiki/Pareto_distribution), resulting in a heavily skewed dataset. Far more realistic!
+
 <img width="593" height="442" alt="Screenshot 2025-10-08 at 18 50 36" src="https://github.com/user-attachments/assets/ec1128a0-95af-4401-bb1c-bd2140880034" />
+
+Running the sim:
+```
+(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5 | grep 'input bytes'
+00:00:00: [executor-0  ] [0-0] input bytes=2.63 MB
+00:00:00: [executor-0  ] [0-1] input bytes=18.5 MB
+00:00:00: [executor-0  ] [0-2] input bytes=17.51 MB
+00:00:00: [executor-0  ] [0-3] input bytes=81.51 MB
+00:00:00: [executor-0  ] [0-4] input bytes=504.2 MB
+00:00:00: [executor-0  ] [0-5] input bytes=11.3 MB
+00:00:00: [executor-0  ] [0-6] input bytes=3.91 MB
+00:00:00: [executor-0  ] [0-7] input bytes=310.48 MB
+00:00:00: [executor-0  ] [0-8] input bytes=45.93 MB
+00:00:00: [executor-0  ] [0-9] input bytes=28.02 MB
+```
+It's clear that some tasks are handling more data than others. Running the sim several times, it's not clear how to interpret the numbers.
+```
+(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5
+00:00:03: [main        ] job completed successfully
+00:00:03: [report      ] {"utilization": 0.631879572897418, "runtime": 3.165160080787559}
+
+(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5
+00:00:04: [main        ] job completed successfully
+00:00:04: [report      ] {"utilization": 0.42678031467385535, "runtime": 4.686251758187104}
+
+(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5
+00:00:02: [main        ] job completed successfully
+00:00:02: [report      ] {"utilization": 0.7940439222567488, "runtime": 2.5187523560608693}
+```
+Since our simulation is now stochastic (using random inputs), the outputs will constantly vary. You can't rely on any single run to draw conclusions. You run thousands of simulations to form a statistically significant result. 
+
+> Randomness is seemingly chaotic, yet inherently consistent
+
+Suppose we suspect that our dataset will become skewed over the coming months. How can we forecast and prepare for it?
