@@ -72,11 +72,11 @@ Some stretch goals:
 
 ## Walkthrough
 
-Consider a straightforward SQL query.
+**Consider** a straightforward SQL query.
 ```sql
 SELECT * FROM foo;
 ```
-which may be represented using the [examples/simple/dag.json](https://github.com/fhalde/fauxspark/blob/main/examples/simple/dag.json).
+which could be represented using this json [examples/simple/dag.json](https://github.com/fhalde/fauxspark/blob/main/examples/simple/dag.json).
 ```json
 [
   {
@@ -96,15 +96,15 @@ which may be represented using the [examples/simple/dag.json](https://github.com
 ]
 
 ```
-This is a single stage query (no shuffle) reading an input of 1024 MB uniformly distributed across 10 partitions. Based on historical analysis, our executor throughput is 102.4 MB/s.
+This is a single stage query (no shuffle) reading an input of 1024 MB uniformly distributed across 10 partitions. Based on historical analysis, we know executor throughput is 102.4 MB/s.
 
 Let's run the simulation:
 ```bash
 (fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json # 1 executor, 1 core (default parameters)
- 10.00: [main        ] utilization: 1.0
- 10.00: [main        ] job completed successfully
+00:00:10: [main        ] job completed successfully
+00:00:10: [report      ] {"utilization": 1.0, "runtime": 10.0}
 ```
-10 seconds. Since the simulator is currently idealized, the utilization is 100%. `time` reports the simulation completed in just under 0.09s.
+Since the simulator is currently idealized (no network/scheduling delays etc.,) the utilization is 1.0 (100%).
 
 A few more runs:
 ```
@@ -126,11 +126,31 @@ Two observations:
 1. The execution time didn't shrink by half unlike before (5.0 ➜ 3.0)
 2. The utilization dropped by ~16%
 
-There's nothing surprising about #1. The number of tasks was not divisble by the cores. Looking at the schedule more closely, we have 4 tasks scheduled in the first batch (1s), then another batch of 4 tasks (1s), and finally 2 tasks (1s) totaling to 3s.
+Observation #1 is not surprising. The total number of tasks wasn't divisible by the number of cores. Looking at the schedule step by step:
+
+- First batch: 4 tasks run in 1s
+- Second batch: 4 tasks run in 1s
+- Final batch: 2 tasks run in 1s
+
+This adds up to a total runtime of 3s.
 
 To understand utilization, we first need to define it. In the simulator, utilization is defined as:
 > Σ task.runtime / Σ executor.uptime * executor.cores
 
 In our example, the last batch kept 2 cores idle hence the drop in utilization.
 
-... TBD shuffle
+----
+
+**The** value of simulation extends beyond this simple example. Real world datasets are rarely uniformly distributed, so let's model that.
+```json
+"input": {
+  "size": "1024 MB",
+  "partitions": 10,
+  "distribution": {
+    "kind": "pareto",
+    "alpha": 1.5
+  }
+}
+```
+This will generate 10 randomly sized partitions that together sum to 1024 MB and are heavily skewed. Far more realistic!
+<img width="593" height="442" alt="Screenshot 2025-10-08 at 18 50 36" src="https://github.com/user-attachments/assets/ec1128a0-95af-4401-bb1c-bd2140880034" />
