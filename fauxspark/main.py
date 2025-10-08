@@ -15,7 +15,6 @@ import numpy as np
 
 def main(args: dict[str, Any], seed: int) -> None:
     np.random.seed(seed)
-    print(f"random seed: {seed}")
     try:
         with open(args["file"], "r") as f:
             DAG = util.init_dag(json.load(f))
@@ -26,6 +25,7 @@ def main(args: dict[str, Any], seed: int) -> None:
         print(f"Error: Invalid JSON in DAG file {args['file']}: {e}")
         sys.exit(1)
     env = simpy.Environment()
+    util.log(env, "main", f"random seed: {seed}")
     util.log(env, "main", "fauxspark!")
     scheduler = Scheduler(env, DAG)
     util.log(env, "main", f"starting {args['executors']} executors...")
@@ -198,3 +198,34 @@ def cli() -> None:
 
 if __name__ == "__main__":
     cli()
+
+
+def optimizer(utilization: float, runtime: float) -> None:
+    """
+    Find the optimal number of cores to use to achieve the desired p10 utilization and p90 runtime.
+    """
+    import random as rand
+    import numpy as np
+
+    util.LOG = False
+    for cores in range(1, 11):
+        stats = []
+        for _ in range(1000):  # 1000 sims per cores configuration
+            rand.seed(0)  # reset seed for fairness
+            stat = main(
+                args={"executors": 1, "cores": cores, "file": "./examples/simple/dag.json"},
+                seed=rand.randint(0, 1000000),
+            )
+            stats.append(stat)
+        utilizations = list(map(lambda x: x["utilization"], stats))
+        runtimes = list(map(lambda x: x["runtime"], stats))
+        u = np.percentile(utilizations, 10)
+        r = np.percentile(runtimes, 90)
+        if u > utilization and r < runtime:
+            print(
+                f"{Fore.GREEN}candidate configuration: cores={cores} has given p10 utilization {u} and p90 runtime {r}{Style.RESET_ALL}"
+            )
+        else:
+            print(
+                f"{Fore.RED}candidate configuration: cores={cores} has given p10 utilization {u} and p90 runtime {r}{Style.RESET_ALL}"
+            )

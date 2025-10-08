@@ -6,13 +6,16 @@ import numpy as np
 from fauxspark import dist
 from fauxspark.models import Stage, Task
 
+LOG = True
+
 
 def log(env: simpy.Environment, component: str, msg: str) -> None:
     hours = int(env.now // 3600)
     minutes = int((env.now % 3600) // 60)
     seconds = int(env.now % 60)
     time = f"{hours:02}:{minutes:02}:{seconds:02}"
-    print(f"{Style.BRIGHT}{Fore.RED}{time}{Style.RESET_ALL}: [{component:<12}] {msg} ")
+    if LOG:
+        print(f"{Style.BRIGHT}{Fore.RED}{time}{Style.RESET_ALL}: [{component:<12}] {msg} ")
 
 
 def nextidgen() -> Generator[int, None, None]:
@@ -44,9 +47,9 @@ def init_dag(m) -> list[Stage]:
             stage.tasks = [
                 Task(index=i, status="pending", stage=stage) for i in range(stage.input.partitions)
             ]
-            print(
-                f"s={stage.id} input shape: {stage.input.splits.shape} output shape: {stage.output.splits.shape}"
-            )
+            # print(
+            #     f"s={stage.id} input shape: {stage.input.splits.shape} output shape: {stage.output.splits.shape}"
+            # )
         else:
             partitions = dag[stage.deps[0]].output.partitions
             accumulated = np.sum(
@@ -61,8 +64,8 @@ def init_dag(m) -> list[Stage]:
                 stage.output.splits = accumulated[:, None] * w
             else:
                 stage.output.splits = accumulated
-            print(
-                f"s={stage.id} input shape: {accumulated.shape} output shape: {stage.output.splits.shape}"
-            )
+            # print(
+            #     f"s={stage.id} input shape: {accumulated.shape} output shape: {stage.output.splits.shape}"
+            # )
             stage.tasks = [Task(index=i, status="pending", stage=stage) for i in range(partitions)]
     return dag
