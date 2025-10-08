@@ -3,6 +3,7 @@
     "id": 0,
     "deps": [],
     "status": "pending",
+    "ratio": [1.0],
     "input": {
       "size": "1024 MB",
       "partitions": 10,
@@ -11,10 +12,8 @@
       }
     },
     "output": {
+      "shuffle": false,
       "partitions": 10,
-      "ratio": [
-        1.0
-      ],
       "distribution": {
         "kind": "uniform"
       }

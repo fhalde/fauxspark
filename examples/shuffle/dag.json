@@ -1,38 +1,76 @@
 [
     {
-        "id": 0,
-        "deps": [],
-        "status": "pending",
-        "input": {
-            "size": "1024 GB",
-            "partitions": 10,
-            "distribution": {
-                "kind": "uniform"
-            }
-        },
-        "output": {
-            "partitions": 10,
-            "ratio": [1.0],
-            "distribution": {
-                "kind": "pareto",
-                "alpha": 1.5
-            }
-        },
-        "throughput": "102.4 MB",
-        "tasks": []
+      "id": 0,
+      "deps": [],
+      "status": "pending",
+      "ratio": [1.0],
+      "input": {
+        "size": "1024 B",
+        "partitions": 10,
+        "distribution": {
+          "kind": "uniform"
+        }
+      },
+      "output": {
+        "shuffle": true,
+        "partitions": 20,
+        "distribution": {
+          "kind": "uniform"
+        }
+      },
+      "throughput": "102.4 MB",
+      "tasks": []
     },
     {
-        "id": 1,
-        "deps": [0],
-        "status": "pending",
-        "output": {
-            "partitions": 10,
-            "ratio": [1.0],
-            "distribution": {
-                "kind": "uniform"
-            }
-        },
-        "throughput": "102.4 MB",
-        "tasks": []
+      "id": 1,
+      "deps": [],
+      "status": "pending",
+      "ratio": [1.0],
+      "input": {
+        "size": "1024 B",
+        "partitions": 40,
+        "distribution": {
+          "kind": "uniform"
+        }
+      },
+      "output": {
+        "shuffle": true,
+        "partitions": 20,
+        "distribution": {
+          "kind": "uniform"
+        }
+      },
+      "throughput": "102.4 MB",
+      "tasks": []
+    },
+    {
+      "id": 2,
+      "deps": [0, 1],
+      "ratio": [1.0, 1.0],
+      "output": {
+        "shuffle": true,
+        "partitions": 10,
+        "distribution": {
+          "kind": "uniform"
+        }
+      },
+      "status": "pending",
+      "throughput": "102.4 MB",
+      "tasks": []
+    },
+    {
+      "id": 3,
+      "deps": [2],
+      "ratio": [1.0],
+      "output": {
+        "shuffle": true,
+        "partitions": 10,
+        "distribution": {
+          "kind": "uniform"
+        }
+      },
+      "status": "pending",
+      "throughput": "102.4 MB",
+      "tasks": []
     }
-]
+  ]

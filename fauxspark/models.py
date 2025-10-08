@@ -23,7 +23,7 @@ class Input(BaseModel):
 
 class Output(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    ratio: list[float]
+    shuffle: bool
     partitions: int
     distribution: dict[Any, Any]
     splits: Optional[np.ndarray] = None
@@ -33,6 +33,7 @@ class Stage(BaseModel):
     id: int
     deps: list[int]
     status: str
+    ratio: list[float]
     input: Optional[Input] = None
     output: Optional[Output] = None
     tasks: list["Task"]

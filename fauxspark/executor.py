@@ -1,11 +1,12 @@
 import typing
 import simpy
-from typing import Generator, Mapping
+from typing import Generator
 from .models import Stage, LaunchTask, StatusUpdate, FetchFailed, KillTask
 from . import util
 from functools import partial
 from colorama import Fore, Style
 from typing import TYPE_CHECKING
+import humanfriendly as hf
 
 if TYPE_CHECKING:
     from .scheduler import Scheduler
@@ -105,6 +106,11 @@ class Executor(object):
                     else:
                         self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
                         return
+            util.log(
+                self.env,
+                "executor",
+                f"[{stage.id}-{launch_task.task.index}] input bytes={hf.format_size(input_bytes)}",
+            )
             yield self.env.timeout(input_bytes / stage.throughput)
             self.computed += self.env.now - start_time
             self.queue.put(StatusUpdate(tid=tid, status="completed", eid=self.id))
