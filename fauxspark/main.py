@@ -15,18 +15,29 @@ from .models import Stage
 import numpy as np
 
 
-def main(DAG: list[Stage], args: argparse.Namespace) -> None:
+def main(args: dict[str, Any], seed: int) -> None:
+    np.random.seed(seed)
+    print(f"random seed: {seed}")
+    try:
+        with open(args["file"], "r") as f:
+            DAG = util.init_dag(json.load(f))
+    except FileNotFoundError:
+        print(f"Error: DAG file {args['file']} not found")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in DAG file {args['file']}: {e}")
+        sys.exit(1)
     env = simpy.Environment()
     util.log(env, "main", "fauxspark!")
     scheduler = Scheduler(env, DAG)
-    util.log(env, "main", f"starting {args.executors} executors...")
+    util.log(env, "main", f"starting {args['executors']} executors...")
 
     def mk_executor(i: int) -> Executor:
         executor = Executor(
             env=env,
             DAG=DAG,
             id=i,
-            cores=args.cores,
+            cores=args["cores"],
             queue=simpy.Store(env),
             scheduler_queue=scheduler.scheduler_queue,
             scheduler=scheduler,
@@ -34,7 +45,7 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
         return executor
 
     def start_executors() -> None:
-        for i in range(args.executors):
+        for i in range(args["executors"]):
             executor = mk_executor(i)
             executor.start()
             scheduler.scheduler_queue.put(executor)
@@ -45,7 +56,7 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
     util.log(env, "main", "starting scheduler")
     scheduler.start()
 
-    last_eid = args.executors
+    last_eid = args["executors"]
 
     def simulate_failure(eid: int, t: float) -> Generator[Any, None, None]:
         yield env.timeout(t)
@@ -54,8 +65,8 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
             return
         executor.kill()
         scheduler.scheduler_queue.put(ExecutorKilled(eid=eid))
-        if args.auto_replace:
-            yield env.timeout(args.auto_replace_delay)
+        if args["auto_replace"]:
+            yield env.timeout(args["auto_replace_delay"])
             nonlocal last_eid
             executor = mk_executor(last_eid)
             last_eid += 1
@@ -70,10 +81,10 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
         executor.start()
         scheduler.scheduler_queue.put(executor)
 
-    for eid, t in args.sf:
+    for eid, t in args["sf"]:
         env.process(simulate_failure(eid, t))
 
-    for t in args.sa:
+    for t in args["sa"]:
         env.process(simulate_auto_replace(t))
 
     env.run()
@@ -97,6 +108,7 @@ def main(DAG: list[Stage], args: argparse.Namespace) -> None:
         util.log(env, "main", f"{Fore.RED}job did not complete{Style.RESET_ALL}\n{DAG}")
         for stage in scheduler.DAG:
             util.log(env, "main", f"{stage.tasks!r}")
+    return stats
 
 
 def cli() -> None:
@@ -183,19 +195,7 @@ def cli() -> None:
 
     args = parser.parse_args()
     seed = args.seed or random.randint(0, 1000000)
-    np.random.seed(seed)
-    print(f"random seed: {seed}")
-    try:
-        with open(args.file, "r") as f:
-            dag = util.init_dag(json.load(f))
-    except FileNotFoundError:
-        print(f"Error: DAG file '{args.file}' not found")
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON in DAG file '{args.file}': {e}")
-        sys.exit(1)
-
-    main(DAG=dag, args=args)
+    main(args=vars(args), seed=seed)
 
 
 if __name__ == "__main__":
