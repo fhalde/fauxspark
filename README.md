@@ -14,7 +14,7 @@ This simulator intends to fill that gap by allowing users to experiment and obse
 
 Like any simulator, the numbers produced here are approximate & may differ from real-world behavior, and are only as accurate as the model. **The plan of course is to make the model better** 😀
 
-A [walkthrough](https://github.com/fhalde/fauxspark/edit/main/README.md#walkthrough) demonstrating how to use this tool is provided below.
+A [walkthrough](https://github.com/fhalde/fauxspark?tab=readme-ov-file#walkthrough) demonstrating how to use this tool is provided below.
 ## Getting Started
 
 ```bash
