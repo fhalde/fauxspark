@@ -192,18 +192,16 @@ It's clear that some tasks are handling more data than others. Running the sim s
 00:00:02: [main        ] job completed successfully
 00:00:02: [report      ] {"utilization": 0.7940439222567488, "runtime": 2.5187523560608693}
 ```
-Since our simulation is now stochastic (using random inputs), the outputs will constantly vary. You can't rely on any single run to draw conclusions. You run thousands of simulations to form a statistically significant result. 
+Since our simulation is now stochastic (using random inputs), the outputs will constantly vary. You can't rely on any single run to draw conclusions. In simulations, it's common to run thousands of simulations to form a statistically significant result. 
 
-> Randomness is seemingly chaotic, yet inherently consistent
-
-Suppose we anticipate that our dataset will skew over the coming months, and your team wants to plan capacity to minimize wasted cost (1 − utilization) while maintaining the target SLA. You could write a optimization function such as [this](https://github.com/fhalde/fauxspark/blob/main/fauxspark/main.py#L203).
+Suppose we anticipate that our dataset will skew over the coming months, and your team wants to plan capacity to minimize wasted cost (1 − utilization) while maintaining a target SLA. A simple way to approach this is using a optimizer function such as this [this](https://github.com/fhalde/fauxspark/blob/main/fauxspark/main.py#L203).
 
 This function takes two inputs
 
 - utilization
 - runtime
   
-and performs 10k simulations for each cluster configuration and selects the ones where the p90 of 10k sim runtimes & waste (1-utilization) is below the target SLA and wasted budget. I chose p90 arbitrarily for this example.
+and performs 10k simulations for each cluster configuration and filters the ones where the p90 of 10k sim runtimes & waste (1-utilization) was below the target SLA and wasted budget. I chose p90 arbitrarily for this example.
 
 Let's be ambitious
 
@@ -225,7 +223,6 @@ Let's be ambitious
 
 
 _pretty printed markdown table from console logs_
-
 
 It's apparent that under skewed conditions, utilization declines quickly. We might have to sacrifice some $$ for the projected skew or simply mitigate skew altogether.
 ```
@@ -264,3 +261,4 @@ It's apparent that under skewed conditions, utilization declines quickly. We mig
 Finally! According to the simulation, a 2 core configuration offers the optimal trade-off, achieving 65% utilization (35% wasted computational power) and a runtime of 7.6s under the expected skew.
 
 By the way, did you notice that despite all the randomness in our simulations, the percentiles consistently converged?!
+> Randomness is seemingly chaotic, yet inherently consistent
