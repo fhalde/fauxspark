@@ -208,7 +208,7 @@ and performs 10k simulations for each cluster configuration and selects the ones
 Let's be ambitious
 
 ```
->>> m.optimizer(utilization=1, runtime=1)
+>>> m.optimizer(waste=0, runtime=1)
 ```
 | Status | Cores | p90 Waste | p90 Runtime |
 |:------:|------:|----------:|------------:|
