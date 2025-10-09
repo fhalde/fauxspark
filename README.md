@@ -132,8 +132,6 @@ Observation #1 is not surprising. The total number of tasks wasn't divisible by 
 - Second batch: 4 tasks run in 1s
 - Final batch: 2 tasks run in 1s
 
-This adds up to a total runtime of 3s.
-
 To understand utilization, we first need to define it. In the simulator, utilization is defined as:
 > Σ task.runtime / Σ executor.uptime * executor.cores
 
