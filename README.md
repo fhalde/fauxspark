@@ -76,7 +76,7 @@ Some stretch goals:
 ```sql
 SELECT * FROM foo;
 ```
-which could be represented using this json [examples/simple/dag.json](https://github.com/fhalde/fauxspark/blob/main/examples/simple/dag.json).
+which could be represented using this [DAG](https://github.com/fhalde/fauxspark/blob/main/examples/simple/dag.json).
 ```json
 [
   {
@@ -96,7 +96,7 @@ which could be represented using this json [examples/simple/dag.json](https://gi
 ]
 
 ```
-This is a single stage query (no shuffle) reading an input of 1024 MB uniformly distributed across 10 partitions. Let's assume a single core can process 102.4 MB/s for now.
+This is a single stage query (no shuffle) reading an input of 1024 MB uniformly distributed across 10 partitions. Let's assume for now a single core can process at a rate of 102.4 MB/s.
 
 Let's run the simulation:
 ```bash
@@ -109,14 +109,14 @@ Since the simulator is currently idealized (no network/scheduling delays etc.,) 
 A few more runs:
 ```
 # double the cores
-(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 2
+(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 2 # 1 executor, 2 core
 00:00:05: [main        ] job completed successfully
 00:00:05: [report      ] {"utilization": 1.0, "runtime": 5.0}
 ```
 
 ```
 # and again
-(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 4
+(fauxspark) ➜  fauxspark git:(main) uv run sim -f examples/simple/dag.json -c 4 # 1 executor, 4 core
 00:00:03: [main        ] job completed successfully
 00:00:03: [report      ] {"utilization": 0.8333333333333334, "runtime": 3.0}
 ```
@@ -166,7 +166,7 @@ This will split our 1024 MB input into 10 randomly sized partitions that follow 
 
 Running the sim:
 ```
-(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5 | grep 'input bytes'
+(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5 # 1 executor, 5 core
 00:00:00: [executor-0  ] [0-0] input bytes=2.63 MB
 00:00:00: [executor-0  ] [0-1] input bytes=18.5 MB
 00:00:00: [executor-0  ] [0-2] input bytes=17.51 MB
@@ -180,15 +180,15 @@ Running the sim:
 ```
 It's clear that some tasks are handling more data than others. Running the sim several times, it's not clear how to interpret the numbers.
 ```
-(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5
+(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5 # 1 executor, 5 core
 00:00:03: [main        ] job completed successfully
 00:00:03: [report      ] {"utilization": 0.631879572897418, "runtime": 3.165160080787559}
 
-(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5
+(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5 # 1 executor, 5 core
 00:00:04: [main        ] job completed successfully
 00:00:04: [report      ] {"utilization": 0.42678031467385535, "runtime": 4.686251758187104}
 
-(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5
+(fauxspark) ➜  fauxspark git:(main) ✗ uv run sim -f examples/simple/dag.json -c 5 # 1 executor, 5 core
 00:00:02: [main        ] job completed successfully
 00:00:02: [report      ] {"utilization": 0.7940439222567488, "runtime": 2.5187523560608693}
 ```
