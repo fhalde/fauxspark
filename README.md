@@ -203,65 +203,64 @@ This function takes two inputs
 - utilization
 - runtime
   
-and performs 10k simulations for each cluster configuration and selects the ones where the p90 of 10k sim runtimes is below the target SLA and the p10 utilization of 10k sims exceeds the required utilization. I chose p90 and p10 arbitrarily for this example.
+and performs 10k simulations for each cluster configuration and selects the ones where the p90 of 10k sim runtimes & waste (1-utilization) is below the target SLA and wasted budget. I chose p90 arbitrarily for this example.
 
 Let's be ambitious
 
 ```
 >>> m.optimizer(utilization=1, runtime=1)
 ```
-| Status | Cores | Utilization (p10) | Runtime (p90) |
-|:------:|------:|----------------:|------------:|
-| 👎     | 1     | 1.0000          | 10.0000     |
-| 👎     | 2     | 0.6491          | 7.7028      |
-| 👎     | 3     | 0.4586          | 7.2678      |
-| 👎     | 4     | 0.3518          | 7.1073      |
-| 👎     | 5     | 0.2847          | 7.0252      |
-| 👎     | 6     | 0.2393          | 6.9648      |
-| 👎     | 7     | 0.2057          | 6.9449      |
-| 👎     | 8     | 0.1805          | 6.9240      |
-| 👎     | 9     | 0.1607          | 6.9129      |
-| 👎     | 10    | 0.1447          | 6.9116      |
+| Status | Cores | p90 Waste | p90 Runtime |
+|:------:|------:|----------:|------------:|
+| 👎     | 1     | 0.0000    | 10.0000     |
+| 👎     | 2     | 0.3537    | 7.7369      |
+| 👎     | 3     | 0.5431    | 7.2947      |
+| 👎     | 4     | 0.6494    | 7.1297      |
+| 👎     | 5     | 0.7160    | 7.0411      |
+| 👎     | 6     | 0.7624    | 7.0133      |
+| 👎     | 7     | 0.7958    | 6.9945      |
+| 👎     | 8     | 0.8210    | 6.9833      |
+| 👎     | 9     | 0.8408    | 6.9802      |
+| 👎     | 10    | 0.8567    | 6.9763      |
+
 
 _pretty printed markdown table from console logs_
 
 
 It's apparent that under skewed conditions, utilization declines quickly. We might have to sacrifice some $$ for the projected skew or simply mitigate skew altogether.
 ```
->>> m.optimizer(utilization=0.7, runtime=8)
+>>> m.optimizer(waste=0.3, runtime=8)
 ```
-| Status | Cores | Utilization (p10) | Runtime (p90) |
-|:------:|------:|----------------:|------------:|
-| 👎     | 1     | 1.0000          | 10.0000     |
-| 👎     | 2     | 0.6562          | 7.6200      |
-| 👎     | 3     | 0.4634          | 7.1939      |
-| 👎     | 4     | 0.3558          | 7.0263      |
-| 👎     | 5     | 0.2882          | 6.9407      |
-| 👎     | 6     | 0.2422          | 6.8826      |
-| 👎     | 7     | 0.2080          | 6.8680      |
-| 👎     | 8     | 0.1825          | 6.8484      |
-| 👎     | 9     | 0.1624          | 6.8417      |
-| 👎     | 10    | 0.1462          | 6.8400      |
-
-
+| Status | Cores | p90 Waste | p90 Runtime |
+|:------:|------:|----------:|------------:|
+| 👎     | 1     | 0.0000    | 10.0000     |
+| 👎     | 2     | 0.3512    | 7.7062      |
+| 👎     | 3     | 0.5432    | 7.2976      |
+| 👎     | 4     | 0.6503    | 7.1495      |
+| 👎     | 5     | 0.7178    | 7.0861      |
+| 👎     | 6     | 0.7634    | 7.0439      |
+| 👎     | 7     | 0.7964    | 7.0179      |
+| 👎     | 8     | 0.8215    | 7.0039      |
+| 👎     | 9     | 0.8411    | 6.9929      |
+| 👎     | 10    | 0.8569    | 6.9882      |
 
 ```
->>> m.optimizer(utilization=0.6, runtime=8)
+>>> m.optimizer(waste=0.6, runtime=8)
 ```
-| Status | Cores | Utilization (p10) | Runtime (p90) |
-|:------:|------:|----------------:|------------:|
-| 👎     | 1     | 1.0000          | 10.0000     |
-| ✅     | 2     | 0.6536          | 7.6503      |
-| 👎     | 3     | 0.4631          | 7.1980      |
-| 👎     | 4     | 0.3553          | 7.0370      |
-| 👎     | 5     | 0.2875          | 6.9559      |
-| 👎     | 6     | 0.2409          | 6.9198      |
-| 👎     | 7     | 0.2071          | 6.8974      |
-| 👎     | 8     | 0.1816          | 6.8832      |
-| 👎     | 9     | 0.1615          | 6.8816      |
-| 👎     | 10    | 0.1453          | 6.8804      |
+| Status | Cores | p90 Waste | p90 Runtime |
+|:------:|------:|----------:|------------:|
+| 👎     | 1     | 0.0000    | 10.0000     |
+| ✅     | 2     | 0.3456    | 7.6400      |
+| 👎     | 3     | 0.5377    | 7.2109      |
+| 👎     | 4     | 0.6457    | 7.0567      |
+| 👎     | 5     | 0.7131    | 6.9703      |
+| 👎     | 6     | 0.7597    | 6.9355      |
+| 👎     | 7     | 0.7933    | 6.9127      |
+| 👎     | 8     | 0.8189    | 6.9015      |
+| 👎     | 9     | 0.8387    | 6.8890      |
+| 👎     | 10    | 0.8548    | 6.8890      |
 
 
-Finally! The simulation is suggesting us that we are better off with just 2 cores that provides us with 65% utilization and a runtime of 7.6s.
+Finally! According to the simulation, a 2 core configuration offers the optimal trade-off, achieving 65% utilization (35% wasted computational power) and a runtime of 7.6s under the expected skew.
 
-By the way, did you notice that despite all the randomness in our simulations, the p10 and p90 percentiles consistently converged?!
+By the way, did you notice that despite all the randomness in our simulations, the percentiles consistently converged?!
