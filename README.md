@@ -264,4 +264,4 @@ It's apparent that under skewed conditions, utilization declines quickly. We mig
 
 Finally! The simulation is suggesting us that we are better off with just 2 cores that provides us with 65% utilization and a runtime of 7.6s.
 
-By the way, did you notice that despite all the randomness in our simulations, the p10 and p90 percentiles consistently converge?! And that's simulation theory.
+By the way, did you notice that despite all the randomness in our simulations, the p10 and p90 percentiles consistently converged?!
