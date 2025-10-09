@@ -206,7 +206,7 @@ Let's be ambitious
 ```
 >>> m.optimizer(waste=0, runtime=1)
 ```
-| Status | Cores | p90 Waste | p90 Runtime |
+| Status | Cores | Waste (p90) | Runtime (p90) |
 |:------:|------:|----------:|------------:|
 | 👎     | 1     | 0.0000    | 10.0000     |
 | 👎     | 2     | 0.3537    | 7.7369      |
@@ -222,11 +222,11 @@ Let's be ambitious
 
 _pretty printed markdown table from console logs_
 
-It's apparent that under skewed conditions, utilization declines quickly. We might have to sacrifice some $$ for the projected skew or simply mitigate skew altogether.
+It's apparent that under skewed conditions, waste increases quickly. We might have to sacrifice some $$ for the projected skew or simply mitigate skew altogether.
 ```
 >>> m.optimizer(waste=0.3, runtime=8)
 ```
-| Status | Cores | p90 Waste | p90 Runtime |
+| Status | Cores | Waste (p90) | Runtime (p90) |
 |:------:|------:|----------:|------------:|
 | 👎     | 1     | 0.0000    | 10.0000     |
 | 👎     | 2     | 0.3512    | 7.7062      |
@@ -242,7 +242,7 @@ It's apparent that under skewed conditions, utilization declines quickly. We mig
 ```
 >>> m.optimizer(waste=0.6, runtime=8)
 ```
-| Status | Cores | p90 Waste | p90 Runtime |
+| Status | Cores | Waste (p90) | Runtime (p90) |
 |:------:|------:|----------:|------------:|
 | 👎     | 1     | 0.0000    | 10.0000     |
 | ✅     | 2     | 0.3456    | 7.6400      |
