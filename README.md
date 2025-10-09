@@ -246,7 +246,7 @@ It's apparent that under skewed conditions, utilization declines quickly. We mig
 |:------:|------:|----------:|------------:|
 | 👎     | 1     | 0.0000    | 10.0000     |
 | ✅     | 2     | 0.3456    | 7.6400      |
-| 👎     | 3     | 0.5377    | 7.2109      |
+| ✅     | 3     | 0.5377    | 7.2109      |
 | 👎     | 4     | 0.6457    | 7.0567      |
 | 👎     | 5     | 0.7131    | 6.9703      |
 | 👎     | 6     | 0.7597    | 6.9355      |
@@ -256,7 +256,7 @@ It's apparent that under skewed conditions, utilization declines quickly. We mig
 | 👎     | 10    | 0.8548    | 6.8890      |
 
 
-Finally! According to the simulation, a 2 core configuration offers the optimal trade-off, achieving 65% utilization (35% wasted computational power) and a runtime of 7.6s under the expected skew.
+Finally! According to the simulation results, both the 2 core and 3 core configurations meet the targets, with the 2 core setup being optimal – achieving 35% waste and a runtime of 7.7 seconds.
 
-By the way, did you notice that despite all the randomness in our simulations, the percentiles consistently converged?!
+By the way, did you notice that even with all the randomness in our simulations, the percentiles still converged?
 > Randomness is seemingly chaotic, yet inherently consistent
