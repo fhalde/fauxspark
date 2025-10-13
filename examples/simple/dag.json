@@ -8,7 +8,8 @@
       "size": "1024 MB",
       "partitions": 10,
       "distribution": {
-        "kind": "uniform"
+        "kind": "pareto",
+        "alpha": 1.5
       }
     },
     "output": {

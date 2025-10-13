@@ -12,6 +12,8 @@ from typing import Generator, Any
 import sys
 import numpy as np
 
+util.LOG = False
+
 
 def main(args: dict[str, Any], seed: int) -> None:
     np.random.seed(seed)
@@ -200,32 +202,34 @@ if __name__ == "__main__":
     cli()
 
 
-def optimizer(utilization: float, runtime: float) -> None:
+def optimizer(waste: float, runtime: float) -> None:
     """
-    Find the optimal number of cores to use to achieve the desired p10 utilization and p90 runtime.
+    Find the optimal number of cores to use to keep p90 runtime & waste below the desired thresholds.
     """
     import random as rand
     import numpy as np
 
+    init = random.randint(0, 1000000)
     util.LOG = False
+
     for cores in range(1, 11):
         stats = []
-        for _ in range(1000):  # 1000 sims per cores configuration
-            rand.seed(0)  # reset seed for fairness
+        rand.seed(init)  # reset seed for fairness
+        for _ in range(10000):  # 1000 sims per cores configuration
             stat = main(
                 args={"executors": 1, "cores": cores, "file": "./examples/simple/dag.json"},
                 seed=rand.randint(0, 1000000),
             )
             stats.append(stat)
-        utilizations = list(map(lambda x: x["utilization"], stats))
+        wastes = list(map(lambda x: 1 - x["utilization"], stats))
         runtimes = list(map(lambda x: x["runtime"], stats))
-        u = np.percentile(utilizations, 10)
+        w = np.percentile(wastes, 90)
         r = np.percentile(runtimes, 90)
-        if u > utilization and r < runtime:
+        if r < runtime and w < waste:
             print(
-                f"{Fore.GREEN}candidate configuration: cores={cores} has given p10 utilization {u} and p90 runtime {r}{Style.RESET_ALL}"
+                f"{Fore.GREEN}✅ candidate configuration: cores={cores} has given p90 waste {w} and p90 runtime {r}{Style.RESET_ALL}"
             )
         else:
             print(
-                f"{Fore.RED}candidate configuration: cores={cores} has given p10 utilization {u} and p90 runtime {r}{Style.RESET_ALL}"
+                f"{Fore.RED}👎 candidate configuration: cores={cores} has given p90 waste {w} and p90 runtime {r}{Style.RESET_ALL}"
             )

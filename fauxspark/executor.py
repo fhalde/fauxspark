@@ -106,10 +106,8 @@ class Executor(object):
                     else:
                         self.queue.put(FetchFailed(tid=tid, dep=dep, eid=self.id))
                         return
-            util.log(
-                self.env,
-                "executor",
-                f"[{stage.id}-{launch_task.task.index}] input bytes={hf.format_size(input_bytes)}",
+            self.logger(
+                f"[{stage.id}-{launch_task.task.index}] input bytes={hf.format_size(input_bytes)}"
             )
             yield self.env.timeout(input_bytes / stage.throughput)
             self.computed += self.env.now - start_time
