@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/fhalde/fauxspark/compare/0.2.0...0.3.0) (2025-10-13)
+
+
+### Features
+
+* allow passing seed for np rng ([16bd90e](https://github.com/fhalde/fauxspark/commit/16bd90e29437a0e3f53ddf49ac1e44bc706fafaf))
+* be explicit about input/output/shuffle ([e9dcf78](https://github.com/fhalde/fauxspark/commit/e9dcf786e4c1e3eae966b25f68424a255c19f39f))
+
+
+### Bug Fixes
+
+* make main method easy to script with ([11e15f7](https://github.com/fhalde/fauxspark/commit/11e15f7e4acac7197bbab3c643fcc6c84cbff8da))
+* optimizer ([de3f1af](https://github.com/fhalde/fauxspark/commit/de3f1af03d05af26d005e9ab3a82d713e975c9f8))
+* unnecessary cast ([f055f0c](https://github.com/fhalde/fauxspark/commit/f055f0c845206936963e03c094860ed988fa4301))
+* use get with sane default ([d1bef06](https://github.com/fhalde/fauxspark/commit/d1bef066f41ee5d3d34c2c88e8d8964d56fac91a))
+
 ## [0.2.0](https://github.com/fhalde/fauxspark/compare/0.1.0...0.2.0) (2025-10-07)
 
 
