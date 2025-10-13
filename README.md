@@ -132,8 +132,6 @@ Observation #1 is not surprising. The total number of tasks wasn't divisible by 
 - Second batch: 4 tasks run in 1s
 - Final batch: 2 tasks run in 1s
 
-This adds up to a total runtime of 3s.
-
 To understand utilization, we first need to define it. In the simulator, utilization is defined as:
 > Σ task.runtime / Σ executor.uptime * executor.cores
 
@@ -208,7 +206,7 @@ Let's be ambitious
 ```
 >>> m.optimizer(waste=0, runtime=1)
 ```
-| Status | Cores | p90 Waste | p90 Runtime |
+| Status | Cores | Waste (p90) | Runtime (p90) |
 |:------:|------:|----------:|------------:|
 | 👎     | 1     | 0.0000    | 10.0000     |
 | 👎     | 2     | 0.3537    | 7.7369      |
@@ -224,11 +222,11 @@ Let's be ambitious
 
 _pretty printed markdown table from console logs_
 
-It's apparent that under skewed conditions, utilization declines quickly. We might have to sacrifice some $$ for the projected skew or simply mitigate skew altogether.
+It's apparent that under skewed conditions, waste increases quickly. We might have to sacrifice some $$ for the projected skew or simply mitigate skew altogether.
 ```
 >>> m.optimizer(waste=0.3, runtime=8)
 ```
-| Status | Cores | p90 Waste | p90 Runtime |
+| Status | Cores | Waste (p90) | Runtime (p90) |
 |:------:|------:|----------:|------------:|
 | 👎     | 1     | 0.0000    | 10.0000     |
 | 👎     | 2     | 0.3512    | 7.7062      |
@@ -244,11 +242,11 @@ It's apparent that under skewed conditions, utilization declines quickly. We mig
 ```
 >>> m.optimizer(waste=0.6, runtime=8)
 ```
-| Status | Cores | p90 Waste | p90 Runtime |
+| Status | Cores | Waste (p90) | Runtime (p90) |
 |:------:|------:|----------:|------------:|
 | 👎     | 1     | 0.0000    | 10.0000     |
 | ✅     | 2     | 0.3456    | 7.6400      |
-| 👎     | 3     | 0.5377    | 7.2109      |
+| ✅     | 3     | 0.5377    | 7.2109      |
 | 👎     | 4     | 0.6457    | 7.0567      |
 | 👎     | 5     | 0.7131    | 6.9703      |
 | 👎     | 6     | 0.7597    | 6.9355      |
@@ -258,7 +256,7 @@ It's apparent that under skewed conditions, utilization declines quickly. We mig
 | 👎     | 10    | 0.8548    | 6.8890      |
 
 
-Finally! According to the simulation, a 2 core configuration offers the optimal trade-off, achieving 65% utilization (35% wasted computational power) and a runtime of 7.6s under the expected skew.
+Finally! According to the simulation results, both the 2 core and 3 core configurations meet the targets, with the 2 core setup being optimal – achieving 35% waste and a runtime of 7.7 seconds.
 
-By the way, did you notice that despite all the randomness in our simulations, the percentiles consistently converged?!
+By the way, did you notice that even with all the randomness in our simulations, the percentiles still converged?
 > Randomness is seemingly chaotic, yet inherently consistent
