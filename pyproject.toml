@@ -15,6 +15,7 @@ dependencies = [
     "humanfriendly>=10.0",
     "matplotlib>=3.10.6",
     "py-spy>=0.4.1",
+    "graphviz>=0.21",
 ]
 
 [project.scripts]
