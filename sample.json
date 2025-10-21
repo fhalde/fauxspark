@@ -1,0 +1,112 @@
+[
+  {
+    "id": 0,
+    "shuffle": {
+      "id": 0,
+      "partitions": 10
+    },
+    "shuffle_dependencies": [],
+    "parents": [],
+    "rdd": [
+      {
+        "id": 0,
+        "name": "ParallelCollectionRDD",
+        "partitions": 14,
+        "parents": [],
+        "scope": "parallelize",
+        "cache": false,
+        "replication": 1
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "shuffle": {
+      "id": 0,
+      "partitions": 10
+    },
+    "shuffle_dependencies": [],
+    "parents": [],
+    "rdd": [
+      {
+        "id": 0,
+        "name": "ParallelCollectionRDD",
+        "partitions": 14,
+        "parents": [],
+        "scope": "parallelize",
+        "cache": false,
+        "replication": 1
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "shuffle": null,
+    "shuffle_dependencies": [
+      0,
+      0
+    ],
+    "parents": [
+      0,
+      1
+    ],
+    "rdd": [
+      {
+        "id": 1,
+        "name": "ShuffledRDD",
+        "partitions": 10,
+        "parents": [
+          0
+        ],
+        "scope": "partitionBy",
+        "cache": false,
+        "replication": 1
+      },
+      {
+        "id": 3,
+        "name": "MapPartitionsRDD",
+        "partitions": 10,
+        "parents": [
+          1
+        ],
+        "scope": "map",
+        "cache": false,
+        "replication": 1
+      },
+      {
+        "id": 1,
+        "name": "ShuffledRDD",
+        "partitions": 10,
+        "parents": [
+          0
+        ],
+        "scope": "partitionBy",
+        "cache": false,
+        "replication": 1
+      },
+      {
+        "id": 2,
+        "name": "MapPartitionsRDD",
+        "partitions": 10,
+        "parents": [
+          1
+        ],
+        "scope": "map",
+        "cache": false,
+        "replication": 1
+      },
+      {
+        "id": 4,
+        "name": "UnionRDD",
+        "partitions": 20,
+        "parents": [
+          2,
+          3
+        ],
+        "scope": "union",
+        "cache": false,
+        "replication": 1
+      }
+    ]
+  }
+]
