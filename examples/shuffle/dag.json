@@ -5,7 +5,7 @@
       "status": "pending",
       "ratio": [1.0],
       "input": {
-        "size": "1024 B",
+        "size": "1024 MB",
         "partitions": 10,
         "distribution": {
           "kind": "uniform"
@@ -27,7 +27,7 @@
       "status": "pending",
       "ratio": [1.0],
       "input": {
-        "size": "1024 B",
+        "size": "1024 MB",
         "partitions": 40,
         "distribution": {
           "kind": "uniform"
