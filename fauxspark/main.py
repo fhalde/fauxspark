@@ -12,10 +12,8 @@ from typing import Generator, Any
 import sys
 import numpy as np
 
-util.LOG = False
-
-
 def main(args: dict[str, Any], seed: int) -> None:
+    util.LOG = not args.get("quiet", False)
     np.random.seed(seed)
     try:
         with open(args["file"], "r") as f:
@@ -29,15 +27,21 @@ def main(args: dict[str, Any], seed: int) -> None:
     env = simpy.Environment()
     util.log(env, "main", f"random seed: {seed}")
     util.log(env, "main", "fauxspark!")
-    scheduler = Scheduler(env, DAG)
+    scheduler = Scheduler(env, DAG, max_fetch_retries=args.get("shuffle_fetch_retries", 4))
     util.log(env, "main", f"starting {args['executors']} executors...")
 
     def mk_executor(i: int) -> Executor:
+        az_count = args.get("az_count", 1)
+        az = f"az-{i % az_count}"
         executor = Executor(
             env=env,
             DAG=DAG,
             id=i,
             cores=args["cores"],
+            az=az,
+            network_bandwidth_mb_s=args.get("network_bandwidth_mb_s", 48.0),
+            intra_az_latency_ms=args.get("intra_az_latency_ms", 1.0),
+            inter_az_latency_ms=args.get("inter_az_latency_ms", 12.0),
             queue=simpy.Store(env),
             scheduler_queue=scheduler.scheduler_queue,
             scheduler=scheduler,
@@ -81,11 +85,25 @@ def main(args: dict[str, Any], seed: int) -> None:
         executor.start()
         scheduler.scheduler_queue.put(executor)
 
+    def simulate_shuffle_fetch_failure(
+        dep: int, map_index: int, reduce_index: int, t: float, count: int
+    ) -> Generator[Any, None, None]:
+        yield env.timeout(t)
+        scheduler.inject_fetch_failure(
+            dep_stage_id=dep,
+            map_index=map_index,
+            reduce_index=reduce_index,
+            count=count,
+        )
+
     for eid, t in args.get("sf", []):
         env.process(simulate_failure(eid, t))
 
     for t in args.get("sa", []):
         env.process(simulate_auto_replace(t))
+
+    for dep, map_index, reduce_index, t, count in args.get("sff", []):
+        env.process(simulate_shuffle_fetch_failure(dep, map_index, reduce_index, t, count))
 
     env.run()
     # stats
@@ -100,6 +118,26 @@ def main(args: dict[str, Any], seed: int) -> None:
     eff = computed / total
     stats["utilization"] = eff
     stats["runtime"] = env.now
+    stats["shuffle_local_mb"] = scheduler.network_stats["local_bytes"] / (1024 * 1024)
+    stats["shuffle_intra_az_mb"] = scheduler.network_stats["intra_az_bytes"] / (1024 * 1024)
+    stats["shuffle_inter_az_mb"] = scheduler.network_stats["inter_az_bytes"] / (1024 * 1024)
+    stats["shuffle_intra_az_time_s"] = scheduler.network_stats["intra_az_time_s"]
+    stats["shuffle_inter_az_time_s"] = scheduler.network_stats["inter_az_time_s"]
+    stats["fetch_failures_total"] = scheduler.failure_stats["fetch_failures_total"]
+    stats["fetch_failures_injected"] = scheduler.failure_stats["fetch_failures_injected"]
+    stats["stage_metrics"] = [
+        {
+            "stage_id": stage.id,
+            "status": stage.status,
+            "tasks": len(stage.tasks),
+            "completed_tasks": sum(1 for task in stage.tasks if task.status == "completed"),
+            "failed_tasks": sum(1 for task in stage.tasks if task.status == "failed"),
+            "total_attempts": sum(task.attempts for task in stage.tasks),
+            "total_retries": sum(max(task.attempts - 1, 0) for task in stage.tasks),
+            "fetch_failures": sum(task.fetch_failures for task in stage.tasks),
+        }
+        for stage in scheduler.DAG
+    ]
     util.log(env, "main", f"{Fore.YELLOW}utilization: {eff}")
     if all(stage.status == "completed" for stage in scheduler.DAG):
         util.log(env, "main", f"{Fore.GREEN}job completed successfully")
@@ -162,12 +200,34 @@ def cli() -> None:
         help="Specify list of failure events as pairs of (executor_id,time) to simulate executor failures.",
     )
 
+    def parse_sim_fetch_failure(text: str) -> tuple[int, int, int, float, int]:
+        try:
+            parts = text.split(",")
+            if len(parts) == 4:
+                dep, map_index, reduce_index, t = parts
+                return (int(dep), int(map_index), int(reduce_index), float(t), 1)
+            if len(parts) == 5:
+                dep, map_index, reduce_index, t, count = parts
+                return (int(dep), int(map_index), int(reduce_index), float(t), int(count))
+            raise ValueError
+        except ValueError:
+            raise argparse.ArgumentTypeError(
+                "Each value must look like dep,map_index,reduce_index,time[,count]"
+            )
+
     parser.add_argument(
         "--sa",
         nargs="+",
         default=[],
         type=parse_sim_autoscale,
         help="Specify times (t) at which autoscaling (adding a new executor) should take place.",
+    )
+    parser.add_argument(
+        "--sff",
+        nargs="+",
+        default=[],
+        type=parse_sim_fetch_failure,
+        help="Inject shuffle fetch failures as dep,map,reduce,time[,count].",
     )
 
     parser.add_argument(
@@ -192,6 +252,41 @@ def cli() -> None:
         type=int,
         help="Set the seed for the random number generator.",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress simulation logs and final report output.",
+    )
+    parser.add_argument(
+        "--az-count",
+        type=int,
+        default=1,
+        help="Number of AZs in the simulated cluster (default: 1).",
+    )
+    parser.add_argument(
+        "--network-bandwidth-mb-s",
+        type=float,
+        default=48.0,
+        help="Shuffle network bandwidth in MB/s (default: 48).",
+    )
+    parser.add_argument(
+        "--intra-az-latency-ms",
+        type=float,
+        default=1.0,
+        help="Fixed latency (ms) for intra-AZ shuffle fetches (default: 1).",
+    )
+    parser.add_argument(
+        "--inter-az-latency-ms",
+        type=float,
+        default=12.0,
+        help="Fixed latency (ms) for inter-AZ shuffle fetches (default: 12).",
+    )
+    parser.add_argument(
+        "--shuffle-fetch-retries",
+        type=int,
+        default=4,
+        help="Max retries for shuffle fetch failures before failing a task (default: 4).",
+    )
 
     args = parser.parse_args()
     seed = args.seed or random.randint(0, 1000000)
@@ -210,14 +305,17 @@ def optimizer(waste: float, runtime: float) -> None:
     import numpy as np
 
     init = random.randint(0, 1000000)
-    util.LOG = False
-
     for cores in range(1, 11):
         stats = []
         rand.seed(init)  # reset seed for fairness
         for _ in range(10000):  # 1000 sims per cores configuration
             stat = main(
-                args={"executors": 1, "cores": cores, "file": "./examples/simple/dag.json"},
+                args={
+                    "executors": 1,
+                    "cores": cores,
+                    "file": "./examples/simple/dag.json",
+                    "quiet": True,
+                },
                 seed=rand.randint(0, 1000000),
             )
             stats.append(stat)

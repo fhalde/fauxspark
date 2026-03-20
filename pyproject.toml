@@ -24,6 +24,9 @@ sim = "fauxspark.main:cli"
 [tool.uv]
 package = true
 
+[tool.setuptools.packages.find]
+include = ["fauxspark*"]
+
 [tool.ruff]
 line-length = 100
 

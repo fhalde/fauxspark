@@ -56,6 +56,8 @@ class Task(BaseModel):
     status: str
     stage: "Stage"
     current: Optional[int] = None
+    attempts: int = 0
+    fetch_failures: int = 0
     launched_tasks: dict[int, "LaunchTask"] = Field(default_factory=dict)
 
     def __repr__(self: "Task") -> str:
@@ -89,6 +91,9 @@ class FetchFailed(BaseModel):
     tid: int
     dep: int
     eid: int
+    map_index: Optional[int] = None
+    reduce_index: Optional[int] = None
+    reason: str = "shuffle fetch failed"
 
     def __repr__(self: "FetchFailed") -> str:
         return f"{Fore.RED}FetchFailed{Style.RESET_ALL}(id={self.tid}, dep={self.dep}, executor_id={self.eid})"
@@ -99,3 +104,10 @@ class ExecutorKilled(BaseModel):
 
     def __repr__(self: "ExecutorKilled") -> str:
         return f"{Fore.RED}ExecutorKilled{Style.RESET_ALL}(id={self.eid})"
+
+
+class ShuffleLocation(BaseModel):
+    stage_id: int
+    map_index: int
+    executor_id: int
+    az: str

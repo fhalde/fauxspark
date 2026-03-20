@@ -4,28 +4,41 @@ import simpy
 from colorama import Fore
 from functools import partial
 from fauxspark.executor import Executor
-from .models import (
-    Stage,
-    LaunchTask,
-    StatusUpdate,
-    FetchFailed,
-    ExecutorKilled,
-)
+from .models import Stage, LaunchTask, StatusUpdate, FetchFailed, ExecutorKilled, ShuffleLocation
 from .logic import next_available_executor, runnable_tasks
 from . import util
 
 
 class Scheduler(object):
-    def __init__(self, env: simpy.Environment, DAG: list[Stage]):
+    def __init__(
+        self,
+        env: simpy.Environment,
+        DAG: list[Stage],
+        max_fetch_retries: int = 4,
+    ):
         self.env = env
         self.DAG = DAG
         self.executors: dict[int, Executor] = dict()
-        # tuple of dep (stage id) and partition (task index)
-        self.shuffles: dict[(int, int), Executor] = dict()  # type: ignore
+        self.max_fetch_retries = max_fetch_retries
+        # Driver-side shuffle metadata store: (stage_id, map_task_index) -> location
+        self.shuffles: dict[tuple[int, int], ShuffleLocation] = {}
         self.scheduled: dict[int, LaunchTask] = dict()
         self.scheduler_queue = simpy.Store(env)
         self.nextid: Generator[int, None, None] = util.nextidgen()
         self.logger = partial(util.log, env, "scheduler")
+        self.network_stats: dict[str, float] = {
+            "local_bytes": 0.0,
+            "intra_az_bytes": 0.0,
+            "inter_az_bytes": 0.0,
+            "intra_az_time_s": 0.0,
+            "inter_az_time_s": 0.0,
+        }
+        # (dep_stage_id, map_index, reduce_index) -> remaining injected failures
+        self.fetch_failure_injections: dict[tuple[int, int, int], int] = {}
+        self.failure_stats: dict[str, int] = {
+            "fetch_failures_total": 0,
+            "fetch_failures_injected": 0,
+        }
 
     def start(self: "Scheduler") -> simpy.Process:
         return self.env.process(self.loop())
@@ -70,6 +83,7 @@ class Scheduler(object):
                 status="running",
             )
             task.current = id
+            task.attempts += 1
             task.launched_tasks[id], self.scheduled[id] = launch_task, launch_task
             util.put(executor.queue, launch_task)
             executor.reserve()
@@ -84,26 +98,43 @@ class Scheduler(object):
                 task = launched_task.task
                 task.status, task.current = "killed", None
                 launched_task.status = "killed"
+        # invalidate all shuffle metadata produced by this executor
+        for key, location in list(self.shuffles.items()):
+            if location.executor_id == executor_killed.eid:
+                self.shuffles.pop(key, None)
         # del self.executors[executor.id]
 
     def fetch_failed(self: "Scheduler", fetch_failed: FetchFailed) -> None:
+        self.failure_stats["fetch_failures_total"] += 1
+        if fetch_failed.reason == "injected shuffle fetch failure":
+            self.failure_stats["fetch_failures_injected"] += 1
         launch_task = self.scheduled.pop(fetch_failed.tid, None)
         if launch_task:
             task = launch_task.task
             current_stage = task.stage
-            current_stage.status = "pending"
-            for task in current_stage.tasks:
-                if task.current:
-                    self.scheduled.pop(task.current, None)
-                task.status, task.current = "pending", None
-            parent_stage = self.DAG[fetch_failed.dep]
-            parent_stage.status = "failed"
-            for task in parent_stage.tasks:
-                if task.launched_tasks[task.current].eid not in self.available_executors:
-                    task.status, task.current = "pending", None
+            task.fetch_failures += 1
+            task.status, task.current = "pending", None
+            if all(t.status == "completed" for t in current_stage.tasks):
+                current_stage.status = "completed"
+            else:
+                current_stage.status = "pending"
+            if fetch_failed.reason != "injected shuffle fetch failure":
+                parent_stage = self.DAG[fetch_failed.dep]
+                parent_stage.status = "failed"
+                for parent_task in parent_stage.tasks:
+                    key = (parent_stage.id, parent_task.index)
+                    location = self.shuffles.get(key)
+                    if location is None or location.executor_id not in self.available_executors:
+                        parent_task.status, parent_task.current = "pending", None
             executor = self.executors.get(launch_task.eid, None)
             if executor:
                 executor.release()
+            if task.fetch_failures > self.max_fetch_retries:
+                task.status = "failed"
+                current_stage.status = "failed"
+                self.logger(
+                    f"task [{task.stage.id}-{task.index}] exhausted retries after fetch failure"
+                )
         else:
             self.logger(f"{Fore.MAGENTA}stale {fetch_failed!r}")
 
@@ -116,6 +147,15 @@ class Scheduler(object):
                     task.status, task.current = "completed", status_update.tid
                     launched_task.status = "completed"
                     stage = task.stage
+                    if stage.output and stage.output.shuffle:
+                        executor = self.executors.get(launched_task.eid, None)
+                        if executor is not None:
+                            self.shuffles[(stage.id, task.index)] = ShuffleLocation(
+                                stage_id=stage.id,
+                                map_index=task.index,
+                                executor_id=executor.id,
+                                az=executor.az,
+                            )
                     if all(task.status == "completed" for task in stage.tasks):
                         stage.status = "completed"
                     executor = self.executors.get(launched_task.eid, None)
@@ -128,3 +168,41 @@ class Scheduler(object):
                 executor.release()
         else:
             self.logger(f"{Fore.MAGENTA}stale {status_update!r}")
+
+    def inject_fetch_failure(
+        self: "Scheduler",
+        dep_stage_id: int,
+        map_index: int,
+        reduce_index: int,
+        count: int = 1,
+    ) -> None:
+        key = (dep_stage_id, map_index, reduce_index)
+        self.fetch_failure_injections[key] = self.fetch_failure_injections.get(key, 0) + count
+        self.logger(f"activated fetch-failure injection key={key} count={count}")
+
+    def consume_injected_fetch_failure(
+        self: "Scheduler", dep_stage_id: int, map_index: int, reduce_index: int
+    ) -> bool:
+        key = (dep_stage_id, map_index, reduce_index)
+        remaining = self.fetch_failure_injections.get(key, 0)
+        if remaining <= 0:
+            return False
+        if remaining == 1:
+            self.fetch_failure_injections.pop(key, None)
+        else:
+            self.fetch_failure_injections[key] = remaining - 1
+        return True
+
+    def record_transfer(
+        self: "Scheduler",
+        size_bytes: float,
+        source_az: str,
+        dest_az: str,
+        transfer_time_s: float,
+    ) -> None:
+        if source_az == dest_az:
+            self.network_stats["intra_az_bytes"] += size_bytes
+            self.network_stats["intra_az_time_s"] += transfer_time_s
+        else:
+            self.network_stats["inter_az_bytes"] += size_bytes
+            self.network_stats["inter_az_time_s"] += transfer_time_s

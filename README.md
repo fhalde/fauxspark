@@ -39,11 +39,13 @@ options:
                         Specify how many cores each executor will have (default: 1).
   -f FILE, --file FILE  Path to DAG JSON file
   --sf SF [SF ...]      Specify list of failure events as pairs of (executor_id,time) to simulate executor failures.
+  --sff SFF [SFF ...]   Inject shuffle fetch failures as dep,map,reduce,time[,count].
   --sa SA [SA ...]      Specify times (t) at which autoscaling (adding a new executor) should take place.
   -a AUTO_REPLACE, --auto-replace AUTO_REPLACE
                         Turn on/off auto-replacement of executors on failure.
   -d AUTO_REPLACE_DELAY, --auto-replace-delay AUTO_REPLACE_DELAY
                         Set the delay (in seconds) it takes to replace an executor on failure.
+  --quiet               Suppress simulation logs and final report output.
 ```
 
 ## ✅ Current Features
@@ -52,8 +54,49 @@ FauxSpark currently implements a simplified model of Apache Spark, which include
 
 - DAG scheduling with stages, tasks, and dependencies
 - Automatic retries on executor or shuffle-fetch failures
+- Targeted shuffle fetch-failure injection (`--sff`)
+- Driver-side shuffle metadata tracking (map output locations)
+- AZ-aware shuffle network simulation (local / intra-AZ / inter-AZ)
 - Single-job execution with configurable cluster parameters
 - Simple CLI to tweak cluster size, simulate failures, and scaling up executors
+
+### Network/AZ knobs
+
+You can model cross-AZ cost/latency during shuffle fetches:
+
+```bash
+uv run sim -f examples/shuffle/dag.json \
+  -e 4 -c 2 \
+  --az-count 2 \
+  --network-bandwidth-mb-s 48 \
+  --intra-az-latency-ms 1 \
+  --inter-az-latency-ms 12
+```
+
+The report now includes:
+
+- `shuffle_local_mb`
+- `shuffle_intra_az_mb`
+- `shuffle_inter_az_mb`
+- `shuffle_intra_az_time_s`
+- `shuffle_inter_az_time_s`
+- `fetch_failures_total`
+- `fetch_failures_injected`
+- `stage_metrics` (attempts / retries / fetch failures per stage)
+
+### Injecting shuffle fetch failures
+
+Inject one or more targeted fetch failures for a specific shuffle block:
+
+```bash
+uv run sim -f examples/shuffle/dag.json -e 2 -c 2 \
+  --sff 0,3,4,0.05 0,3,4,0.10,2
+```
+
+Format:
+
+- `dep,map,reduce,time` inject once
+- `dep,map,reduce,time,count` inject `count` times
 
 ## 🚀 Future Ideas
 
