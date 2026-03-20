@@ -3,9 +3,10 @@ import typing
 import simpy
 from colorama import Fore
 from functools import partial
+from collections import deque
 from fauxspark.executor import Executor
-from .models import Stage, LaunchTask, StatusUpdate, FetchFailed, ExecutorKilled, ShuffleLocation
-from .logic import next_available_executor, runnable_tasks
+from .models import Task, Stage, LaunchTask, StatusUpdate, FetchFailed, ExecutorKilled, ShuffleLocation
+from .logic import next_available_executor
 from . import util
 
 
@@ -33,12 +34,17 @@ class Scheduler(object):
             "intra_az_time_s": 0.0,
             "inter_az_time_s": 0.0,
         }
+        self.ready_tasks: dict[int, deque[Task]] = {stage.id: deque() for stage in DAG}
+        self.ready_stages: deque[int] = deque()
+        self.ready_stage_set: set[int] = set()
+        self.stage_children: dict[int, list[int]] = {stage.id: [] for stage in DAG}
         # (dep_stage_id, map_index, reduce_index) -> remaining injected failures
         self.fetch_failure_injections: dict[tuple[int, int, int], int] = {}
         self.failure_stats: dict[str, int] = {
             "fetch_failures_total": 0,
             "fetch_failures_injected": 0,
         }
+        self._init_runtime_state()
 
     def start(self: "Scheduler") -> simpy.Process:
         return self.env.process(self.loop())
@@ -71,10 +77,11 @@ class Scheduler(object):
                     self.logger(f"unhandled: {event!r}")
 
     def schedule_runnable_tasks(self: "Scheduler") -> None:
-        while (executor := next_available_executor(self.available_executors)) and (
-            taskset := runnable_tasks(self.DAG)
-        ) != []:
-            stage, task = taskset.pop(0)
+        while executor := next_available_executor(self.available_executors):
+            stage_task = self._next_runnable()
+            if stage_task is None:
+                return
+            stage, task = stage_task
             stage.status, task.status = "running", "running"
             launch_task = LaunchTask(
                 tid=(id := next(self.nextid)),
@@ -96,7 +103,8 @@ class Scheduler(object):
         for tid in executor.taskprocs.keys():
             if launched_task := self.scheduled.pop(tid, None):
                 task = launched_task.task
-                task.status, task.current = "killed", None
+                task.status, task.current = "pending", None
+                self._enqueue_task(task)
                 launched_task.status = "killed"
         # invalidate all shuffle metadata produced by this executor
         for key, location in list(self.shuffles.items()):
@@ -114,6 +122,7 @@ class Scheduler(object):
             current_stage = task.stage
             task.fetch_failures += 1
             task.status, task.current = "pending", None
+            self._enqueue_task(task)
             if all(t.status == "completed" for t in current_stage.tasks):
                 current_stage.status = "completed"
             else:
@@ -126,6 +135,7 @@ class Scheduler(object):
                     location = self.shuffles.get(key)
                     if location is None or location.executor_id not in self.available_executors:
                         parent_task.status, parent_task.current = "pending", None
+                        self._enqueue_task(parent_task)
             executor = self.executors.get(launch_task.eid, None)
             if executor:
                 executor.release()
@@ -158,9 +168,12 @@ class Scheduler(object):
                             )
                     if all(task.status == "completed" for task in stage.tasks):
                         stage.status = "completed"
+                        for child in self.stage_children[stage.id]:
+                            self._maybe_enqueue_stage(child)
                     executor = self.executors.get(launched_task.eid, None)
                 case "killed":
-                    task.status, task.current = "killed", None
+                    task.status, task.current = "pending", None
+                    self._enqueue_task(task)
                     launched_task.status = "killed"
                     stage = task.stage
                     executor = self.executors.get(launched_task.eid, None)
@@ -168,6 +181,50 @@ class Scheduler(object):
                 executor.release()
         else:
             self.logger(f"{Fore.MAGENTA}stale {status_update!r}")
+
+    def _init_runtime_state(self: "Scheduler") -> None:
+        for stage in self.DAG:
+            for dep in stage.deps:
+                self.stage_children[dep].append(stage.id)
+            for task in stage.tasks:
+                if task.status == "pending":
+                    self.ready_tasks[stage.id].append(task)
+        for stage in self.DAG:
+            self._maybe_enqueue_stage(stage.id)
+
+    def _stage_deps_completed(self: "Scheduler", stage: Stage) -> bool:
+        return all(self.DAG[dep].status == "completed" for dep in stage.deps)
+
+    def _maybe_enqueue_stage(self: "Scheduler", stage_id: int) -> None:
+        stage = self.DAG[stage_id]
+        if stage_id in self.ready_stage_set:
+            return
+        if not self._stage_deps_completed(stage):
+            return
+        if not self.ready_tasks[stage_id]:
+            return
+        self.ready_stages.append(stage_id)
+        self.ready_stage_set.add(stage_id)
+
+    def _enqueue_task(self: "Scheduler", task: Task) -> None:
+        self.ready_tasks[task.stage.id].append(task)
+        self._maybe_enqueue_stage(task.stage.id)
+
+    def _next_runnable(self: "Scheduler") -> tuple[Stage, Task] | None:
+        while self.ready_stages:
+            stage_id = self.ready_stages.popleft()
+            self.ready_stage_set.discard(stage_id)
+            stage = self.DAG[stage_id]
+            if not self._stage_deps_completed(stage):
+                continue
+            queue = self.ready_tasks[stage_id]
+            while queue:
+                task = queue.popleft()
+                if task.status == "pending":
+                    if any(t.status == "pending" for t in queue):
+                        self._maybe_enqueue_stage(stage_id)
+                    return (stage, task)
+        return None
 
     def inject_fetch_failure(
         self: "Scheduler",
