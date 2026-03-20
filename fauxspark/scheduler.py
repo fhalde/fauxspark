@@ -19,6 +19,7 @@ class Scheduler(object):
     ):
         self.env = env
         self.DAG = DAG
+        self.stage_by_id: dict[int, Stage] = {s.id: s for s in DAG}
         self.executors: dict[int, Executor] = dict()
         self.max_fetch_retries = max_fetch_retries
         # Driver-side shuffle metadata store: (stage_id, map_task_index) -> location
@@ -128,7 +129,7 @@ class Scheduler(object):
             else:
                 current_stage.status = "pending"
             if fetch_failed.reason != "injected shuffle fetch failure":
-                parent_stage = self.DAG[fetch_failed.dep]
+                parent_stage = self.stage_by_id[fetch_failed.dep]
                 parent_stage.status = "failed"
                 for parent_task in parent_stage.tasks:
                     key = (parent_stage.id, parent_task.index)
@@ -193,10 +194,10 @@ class Scheduler(object):
             self._maybe_enqueue_stage(stage.id)
 
     def _stage_deps_completed(self: "Scheduler", stage: Stage) -> bool:
-        return all(self.DAG[dep].status == "completed" for dep in stage.deps)
+        return all(self.stage_by_id[dep].status == "completed" for dep in stage.deps)
 
     def _maybe_enqueue_stage(self: "Scheduler", stage_id: int) -> None:
-        stage = self.DAG[stage_id]
+        stage = self.stage_by_id[stage_id]
         if stage_id in self.ready_stage_set:
             return
         if not self._stage_deps_completed(stage):
@@ -214,7 +215,7 @@ class Scheduler(object):
         while self.ready_stages:
             stage_id = self.ready_stages.popleft()
             self.ready_stage_set.discard(stage_id)
-            stage = self.DAG[stage_id]
+            stage = self.stage_by_id[stage_id]
             if not self._stage_deps_completed(stage):
                 continue
             queue = self.ready_tasks[stage_id]

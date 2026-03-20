@@ -29,12 +29,30 @@ def put(q: simpy.Store, event: Any) -> None:
     q.put(event)
 
 
+def _topo_sort(stages: list[Stage]) -> list[Stage]:
+    by_id: dict[int, Stage] = {s.id: s for s in stages}
+    visited: set[int] = set()
+    order: list[Stage] = []
+
+    def visit(sid: int) -> None:
+        if sid in visited:
+            return
+        visited.add(sid)
+        for dep in by_id[sid].deps:
+            visit(dep)
+        order.append(by_id[sid])
+
+    for s in stages:
+        visit(s.id)
+    return order
+
+
 def init_dag(m) -> list[Stage]:
-    """
-    m: topologically sorted list of stages
-    """
-    dag = TypeAdapter(list[Stage]).validate_python(m)
-    for stage in dag:
+    stages = TypeAdapter(list[Stage]).validate_python(m)
+    by_id: dict[int, Stage] = {s.id: s for s in stages}
+    ordered = _topo_sort(stages)
+
+    for stage in ordered:
         if stage.input:
             stage.input.splits = (
                 dist.weights(stage.input.distribution, stage.input.partitions) * stage.input.size
@@ -47,14 +65,12 @@ def init_dag(m) -> list[Stage]:
             stage.tasks = [
                 Task(index=i, status="pending", stage=stage) for i in range(stage.input.partitions)
             ]
-            # print(
-            #     f"s={stage.id} input shape: {stage.input.splits.shape} output shape: {stage.output.splits.shape}"
-            # )
         else:
-            partitions = dag[stage.deps[0]].output.partitions
+            first_dep = by_id[stage.deps[0]]
+            partitions = first_dep.output.partitions
             accumulated = np.sum(
                 [
-                    ratio * dag[dep].output.splits.sum(axis=0)
+                    ratio * by_id[dep].output.splits.sum(axis=0)
                     for ratio, dep in zip(stage.ratio, stage.deps)
                 ],
                 axis=0,
@@ -64,8 +80,5 @@ def init_dag(m) -> list[Stage]:
                 stage.output.splits = accumulated[:, None] * w
             else:
                 stage.output.splits = accumulated
-            # print(
-            #     f"s={stage.id} input shape: {accumulated.shape} output shape: {stage.output.splits.shape}"
-            # )
             stage.tasks = [Task(index=i, status="pending", stage=stage) for i in range(partitions)]
-    return dag
+    return ordered

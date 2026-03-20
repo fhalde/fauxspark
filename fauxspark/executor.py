@@ -91,7 +91,8 @@ class Executor(object):
                 input_bytes = stage.input.splits[launch_task.task.index]
             deps = stage.deps
             for dep in deps:
-                if self.DAG[dep].status != "completed":
+                dep_stage = self.scheduler.stage_by_id[dep]
+                if dep_stage.status != "completed":
                     self.queue.put(
                         FetchFailed(
                             tid=tid,
@@ -102,7 +103,7 @@ class Executor(object):
                         )
                     )
                     return
-                for map_task in self.DAG[dep].tasks:
+                for map_task in dep_stage.tasks:
                     map_index = map_task.index
                     key = (dep, map_index)
                     shuffle_location = self.scheduler.shuffles.get(key)
@@ -111,7 +112,7 @@ class Executor(object):
                             shuffle_location.executor_id, None
                         )
                     ):
-                        block_bytes = self.DAG[dep].output.splits[map_index][launch_task.task.index]
+                        block_bytes = dep_stage.output.splits[map_index][launch_task.task.index]
                         if shuffle_location.executor_id == self.id:  # local fetch
                             self.scheduler.network_stats["local_bytes"] += block_bytes
                             input_bytes += block_bytes
