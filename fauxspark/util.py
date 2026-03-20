@@ -66,6 +66,11 @@ def init_dag(m) -> list[Stage]:
                 Task(index=i, status="pending", stage=stage) for i in range(stage.input.partitions)
             ]
         else:
+            if len(stage.ratio) != len(stage.deps):
+                raise ValueError(
+                    f"Stage {stage.id}: len(ratio)={len(stage.ratio)} "
+                    f"must equal len(deps)={len(stage.deps)}"
+                )
             first_dep = by_id[stage.deps[0]]
             partitions = first_dep.output.partitions
             accumulated = np.sum(
