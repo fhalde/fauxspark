@@ -170,49 +170,6 @@ class Scheduler(object):
         else:
             self.logger(f"{Fore.MAGENTA}stale {status_update!r}")
 
-    def _init_runtime_state(self: "Scheduler") -> None:
-        for stage in self.DAG:
-            for dep in stage.deps:
-                self.stage_children[dep].append(stage.id)
-            for task in stage.tasks:
-                if task.status == "pending":
-                    self.ready_tasks[stage.id].append(task)
-        for stage in self.DAG:
-            self._maybe_enqueue_stage(stage.id)
-
-    def _stage_deps_completed(self: "Scheduler", stage: Stage) -> bool:
-        return all(self.stage_by_id[dep].status == "completed" for dep in stage.deps)
-
-    def _maybe_enqueue_stage(self: "Scheduler", stage_id: int) -> None:
-        stage = self.stage_by_id[stage_id]
-        if stage_id in self.ready_stage_set:
-            return
-        if not self._stage_deps_completed(stage):
-            return
-        if not self.ready_tasks[stage_id]:
-            return
-        self.ready_stages.append(stage_id)
-        self.ready_stage_set.add(stage_id)
-
-    def _enqueue_task(self: "Scheduler", task: Task) -> None:
-        self.ready_tasks[task.stage.id].append(task)
-        self._maybe_enqueue_stage(task.stage.id)
-
-    def _next_runnable(self: "Scheduler") -> tuple[Stage, Task] | None:
-        while self.ready_stages:
-            stage_id = self.ready_stages.popleft()
-            self.ready_stage_set.discard(stage_id)
-            stage = self.stage_by_id[stage_id]
-            if not self._stage_deps_completed(stage):
-                continue
-            queue = self.ready_tasks[stage_id]
-            while queue:
-                task = queue.popleft()
-                if task.status == "pending":
-                    if any(t.status == "pending" for t in queue):
-                        self._maybe_enqueue_stage(stage_id)
-                    return (stage, task)
-        return None
     def inject_fetch_failure(
         self: "Scheduler",
         dep_stage_id: int,
